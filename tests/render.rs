@@ -272,6 +272,33 @@ fn no_snapshot_and_paused_states_render() {
 }
 
 #[test]
+fn layout_grid_never_overflows() {
+    let app = app(Config::default());
+    let widths = [
+        20, 39, 40, 41, 59, 60, 71, 72, 73, 79, 80, 83, 84, 85, 99, 100, 101, 119, 120, 121, 150,
+        200, 400,
+    ];
+    let heights = [
+        8, 11, 12, 13, 16, 17, 18, 19, 20, 21, 23, 24, 25, 27, 30, 36, 50,
+    ];
+    for preset in Preset::all() {
+        let mut view = app.clone();
+        view.preset = preset;
+        for width in widths {
+            for height in heights {
+                let (canvas, _) = ui::render(&view, width, height);
+                for line in canvas.plain().lines() {
+                    assert!(
+                        format::width(line) <= usize::from(width.min(ui::MAX_CANVAS_WIDTH)),
+                        "overflow at {width}x{height} preset {preset:?}: {line:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn extreme_terminal_sizes_are_capped() {
     let app = app(Config::default());
     let (canvas, _) = ui::render(&app, u16::MAX, u16::MAX);
