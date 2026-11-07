@@ -647,6 +647,11 @@ impl Collector {
         let mut summary = ProcessSummary::default();
         let mut processes = Vec::with_capacity(cap);
         for (pid, process) in self.system.processes().iter().take(cap) {
+            // Windows exposes the System Idle Process as PID 0. It is not a
+            // real process and cannot be signalled, so keep it out of the UI.
+            if pid.as_u32() == 0 {
+                continue;
+            }
             let state = ProcessState::from(process.status());
             summary.total += 1;
             match state {
