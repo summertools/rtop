@@ -1,21 +1,21 @@
 [package]
-name = "btop-rs"
+name = "rtop"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "A fast, elegant terminal system monitor written in Rust"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/summertools/btop-rs"
+repository = "https://github.com/summertools/rtop"
 keywords = ["tui", "monitor", "system", "terminal", "btop"]
 categories = ["command-line-utilities", "visualization"]
 
 [lib]
-name = "btop_rs"
+name = "rtop"
 path = "src/lib.rs"
 
 [[bin]]
-name = "btop-rs"
+name = "rtop"
 path = "src/main.rs"
 
 [dependencies]

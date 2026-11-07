@@ -4,15 +4,15 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 
-use btop_rs::app::{App, Overlay, Preset, ToastLevel};
-use btop_rs::config::{Config, GraphSymbol};
-use btop_rs::format;
-use btop_rs::platform::{
+use rtop::app::{App, Overlay, Preset, ToastLevel};
+use rtop::config::{Config, GraphSymbol};
+use rtop::format;
+use rtop::platform::{
     BatteryInfo, BatteryState, CpuBreakdown, CpuSnapshot, DiskSnapshot, HostInfo, MemorySnapshot,
     NetworkSnapshot, ProcessInfo, ProcessState, ProcessSummary, SensorReading, Snapshot,
 };
-use btop_rs::theme::Theme;
-use btop_rs::ui;
+use rtop::theme::Theme;
+use rtop::ui;
 
 fn process(pid: u32, parent: Option<u32>, name: &str, cpu: f32, memory: u64) -> ProcessInfo {
     ProcessInfo {

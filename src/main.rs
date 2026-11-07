@@ -1,4 +1,4 @@
-//! `btop-rs` binary entry point.
+//! `rtop` binary entry point.
 
 use std::io::{self, IsTerminal, Write};
 use std::panic::AssertUnwindSafe;
@@ -12,13 +12,13 @@ use clap::Parser;
 use crossterm::event::{self, Event, KeyEventKind};
 use crossterm::terminal;
 
-use btop_rs::app::{App, ToastLevel};
-use btop_rs::cli::Cli;
-use btop_rs::config::Config;
-use btop_rs::format;
-use btop_rs::platform::{self, Collector, Snapshot};
-use btop_rs::term::{self, ColorMode, Screen, TerminalGuard};
-use btop_rs::{Config as PublicConfig, ui};
+use rtop::app::{App, ToastLevel};
+use rtop::cli::Cli;
+use rtop::config::Config;
+use rtop::format;
+use rtop::platform::{self, Collector, Snapshot};
+use rtop::term::{self, ColorMode, Screen, TerminalGuard};
+use rtop::{Config as PublicConfig, ui};
 
 fn main() {
     if let Err(error) = run() {
@@ -28,7 +28,7 @@ fn main() {
         {
             return;
         }
-        eprintln!("btop-rs: {error}");
+        eprintln!("rtop: {error}");
         std::process::exit(1);
     }
 }
@@ -141,10 +141,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // it must never delay quitting after the terminal has been restored.
     drop(collector_handle);
     for warning in &startup_warnings {
-        eprintln!(
-            "btop-rs: warning: {}",
-            format::sanitize_limited(warning, 500)
-        );
+        eprintln!("rtop: warning: {}", format::sanitize_limited(warning, 500));
     }
     result?;
     Ok(())
@@ -263,15 +260,12 @@ fn wait_interruptible(duration: Duration, stop: &AtomicBool) -> bool {
 
 fn dump(
     config: PublicConfig,
-    theme: btop_rs::theme::Theme,
+    theme: rtop::theme::Theme,
     cli: &Cli,
     warnings: Vec<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for warning in &warnings {
-        eprintln!(
-            "btop-rs: warning: {}",
-            format::sanitize_limited(warning, 500)
-        );
+        eprintln!("rtop: warning: {}", format::sanitize_limited(warning, 500));
     }
     let mut collector = Collector::new();
     // Two samples make CPU and per-process percentages meaningful.
@@ -295,7 +289,7 @@ fn dump(
 fn list_themes() -> io::Result<()> {
     let mut out = io::stdout().lock();
     writeln!(out, "Built-in themes:")?;
-    for name in btop_rs::theme::Theme::builtin_names() {
+    for name in rtop::theme::Theme::builtin_names() {
         writeln!(out, "  {name}")?;
     }
     if let Some(dir) = Config::theme_dir() {
@@ -309,7 +303,7 @@ fn list_themes() -> io::Result<()> {
                     if path.extension().is_some_and(|ext| ext == "theme") {
                         path.file_stem()
                             .map(|stem| stem.to_string_lossy().into_owned())
-                            .filter(|name| btop_rs::config::valid_theme_name(name))
+                            .filter(|name| rtop::config::valid_theme_name(name))
                     } else {
                         None
                     }

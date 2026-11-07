@@ -8,10 +8,10 @@ use crate::config::{Config, GraphSymbol};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "btop-rs",
+    name = "rtop",
     version,
     about = "A fast, elegant terminal system monitor",
-    long_about = "btop-rs shows CPU, memory, disks, network activity, and processes in a \
+    long_about = "rtop shows CPU, memory, disks, network activity, and processes in a \
                   responsive terminal interface. It is a native Rust implementation inspired \
                   by btop, with a focus on safe parsing, a calm visual design, and predictable \
                   behaviour on Linux, macOS, and Windows."
@@ -132,7 +132,7 @@ mod tests {
     use super::*;
 
     fn cli() -> Cli {
-        Cli::parse_from(["btop-rs"])
+        Cli::parse_from(["rtop"])
     }
 
     #[test]

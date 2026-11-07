@@ -19,7 +19,7 @@ fix and a release before public disclosure.
 
 ## Scope
 
-`btop-rs` reads operating-system data and writes it to a terminal. Areas of
+`rtop` reads operating-system data and writes it to a terminal. Areas of
 particular interest:
 
 - terminal escape or bidirectional-text injection through process names,

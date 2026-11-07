@@ -4,7 +4,7 @@
 use std::process::Command;
 
 fn binary() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_btop-rs"))
+    Command::new(env!("CARGO_BIN_EXE_rtop"))
 }
 
 #[test]
@@ -13,14 +13,14 @@ fn dump_renders_a_plain_frame() {
         .args(["--dump", "--width", "100", "--height", "30"])
         .env("NO_COLOR", "1")
         .output()
-        .expect("run btop-rs");
+        .expect("run rtop");
     assert!(
         output.status.success(),
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("btop-rs"));
+    assert!(stdout.contains("rtop"));
     assert!(stdout.contains("cpu"));
     assert!(stdout.contains("mem"));
     assert!(stdout.contains("proc"));
@@ -50,7 +50,7 @@ fn presets_and_themes_are_accepted() {
             ])
             .env("NO_COLOR", "1")
             .output()
-            .expect("run btop-rs");
+            .expect("run rtop");
         assert!(output.status.success());
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(!stdout.is_empty());
@@ -60,7 +60,7 @@ fn presets_and_themes_are_accepted() {
 
 #[test]
 fn list_themes_works_without_a_terminal() {
-    let output = binary().arg("--list-themes").output().expect("run btop-rs");
+    let output = binary().arg("--list-themes").output().expect("run rtop");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     for theme in [
@@ -94,7 +94,7 @@ fn invalid_values_warn_but_still_render() {
         ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("run btop-rs");
+        .expect("run rtop");
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("preset 99"));
@@ -108,7 +108,7 @@ fn tiny_dump_size_renders_the_hint() {
         .args(["--dump", "--width", "20", "--height", "8"])
         .env("NO_COLOR", "1")
         .output()
-        .expect("run btop-rs");
+        .expect("run rtop");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("too small"));
@@ -116,12 +116,12 @@ fn tiny_dump_size_renders_the_hint() {
 
 #[test]
 fn interactive_mode_without_a_terminal_fails_clearly() {
-    let output = Command::new(env!("CARGO_BIN_EXE_btop-rs"))
+    let output = Command::new(env!("CARGO_BIN_EXE_rtop"))
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .output()
-        .expect("run btop-rs");
+        .expect("run rtop");
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("terminal"), "stderr: {stderr}");
@@ -148,7 +148,7 @@ fn explicit_config_file_is_loaded() {
         ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("run btop-rs");
+        .expect("run rtop");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("10 cores") || stdout.contains("cpu"));
@@ -162,7 +162,7 @@ fn help_and_version_are_available() {
 
     let version = binary().arg("--version").output().expect("run version");
     assert!(version.status.success());
-    assert!(String::from_utf8_lossy(&version.stdout).contains("btop-rs"));
+    assert!(String::from_utf8_lossy(&version.stdout).contains("rtop"));
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn tty_dump_is_pure_ascii() {
         ])
         .env("NO_COLOR", "1")
         .output()
-        .expect("run btop-rs");
+        .expect("run rtop");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.is_ascii(), "non-ASCII bytes in --tty output");
@@ -187,8 +187,8 @@ fn closing_the_output_pipe_is_not_a_failure() {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
-        .expect("spawn btop-rs");
+        .expect("spawn rtop");
     drop(child.stdout.take());
-    let status = child.wait().expect("wait for btop-rs");
+    let status = child.wait().expect("wait for rtop");
     assert!(status.success());
 }

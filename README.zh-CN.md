@@ -1,10 +1,10 @@
-# btop-rs
+# rtop
 
 **用 Rust 编写的快速、优雅的终端系统监视器：在 Linux、macOS 和 Windows 上查看 CPU、内存、磁盘、网络与进程。**
 
 [English](README.md) | 简体中文
 
-`btop-rs` 是对 btop 使用体验的原生 Rust 实现。它通过一层类型化的系统快照采样数据，
+`rtop` 是对 btop 使用体验的原生 Rust 实现。它通过一层类型化的系统快照采样数据，
 用渐变色彩和自适应布局呈现信息，并在终端输入输出上默认采取防御性策略。它只有一个二进制，
 不需要后台服务，也不会调用 shell。
 
@@ -42,7 +42,7 @@
 ## 界面截图
 
 ```text
-  btop-rs   0 总览   1 cpu   2 内存   3 网络   4 进程                              ? 14:32:08
+  rtop   0 总览   1 cpu   2 内存   3 网络   4 进程                              ? 14:32:08
  mybox · you · Linux (Fedora 42)  AMD Ryzen 7 7700   up 03:42:10 · load 1.24 0.98 0.74 · 3.80 GHz
 ╭─ cpu 27%  8 cores──────────────────────────────╮╭─ mem 61%  9.8 GiB / 16.0 GiB────────────────╮
 │27%  avg 22%  peak 64%              100% C0 ⣿⣿⣿⣿⣤⣀   41% ││Used      █████████████▎░░░░░░░   9.8 GiB  61%│
@@ -98,28 +98,31 @@ WezTerm、Alacritty、Kitty、GNOME Terminal、Konsole 等。
 
 ```bash
 cargo install --path .
-btop-rs
+rtop
 ```
 
 或直接从 Git 安装：
 
 ```bash
-cargo install --git https://github.com/summertools/btop-rs.git
+cargo install --git https://github.com/summertools/rtop.git
 ```
 
 本地构建：
 
 ```bash
 cargo build --release
-./target/release/btop-rs
+./target/release/rtop
 ```
 
-发布压缩包中只有一个可执行文件：`btop-rs`（Windows 上为 `btop-rs.exe`）。
+发布压缩包中只有一个可执行文件：`rtop`（Windows 上为 `rtop.exe`）。发布流程会生成
+`rtop-linux-x86_64.tar.gz`、`rtop-macos-aarch64.tar.gz`、
+`rtop-macos-x86_64.tar.gz`、`rtop-windows-x86_64.zip`，以及用于完整性校验的
+`SHA256SUMS` 文件。
 
 ## 使用
 
 ```text
-btop-rs [OPTIONS]
+rtop [OPTIONS]
 ```
 
 | 选项 | 说明 |
@@ -143,7 +146,7 @@ btop-rs [OPTIONS]
 `--dump` 不需要终端，非常适合在服务器或 CI 中验证构建：
 
 ```bash
-btop-rs --dump --width 100 --height 30 --preset 1
+rtop --dump --width 100 --height 30 --preset 1
 ```
 
 ### 环境变量
@@ -190,9 +193,9 @@ btop-rs --dump --width 100 --height 30 --preset 1
 
 | 平台 | 路径 |
 | --- | --- |
-| Linux | `$XDG_CONFIG_HOME/btop-rs/btop-rs.toml`，否则 `~/.config/btop-rs/btop-rs.toml` |
-| macOS | `~/Library/Application Support/btop-rs/btop-rs.toml` |
-| Windows | `%APPDATA%\btop-rs\btop-rs.toml` |
+| Linux | `$XDG_CONFIG_HOME/rtop/rtop.toml`，否则 `~/.config/rtop/rtop.toml` |
+| macOS | `~/Library/Application Support/rtop/rtop.toml` |
+| Windows | `%APPDATA%\rtop\rtop.toml` |
 
 示例：
 
@@ -234,10 +237,10 @@ show_key_hints = true
 内置主题：`default`（Tokyo Night）、`dracula`、`gruvbox`、`nord`、`catppuccin`、
 `light`、`tty`。
 
-用户主题放在平台配置目录下的 `btop-rs/themes/`（例如 Linux 的
-`~/.config/btop-rs/themes/`、macOS 的
-`~/Library/Application Support/btop-rs/themes/`，或 Windows 的
-`%APPDATA%\btop-rs\themes\`），语法与 btop 主题一致：
+用户主题放在平台配置目录下的 `rtop/themes/`（例如 Linux 的
+`~/.config/rtop/themes/`、macOS 的
+`~/Library/Application Support/rtop/themes/`，或 Windows 的
+`%APPDATA%\rtop\themes\`），语法与 btop 主题一致：
 
 ```text
 theme[main_bg]="#0b0e14"
@@ -256,7 +259,7 @@ theme[cpu_end]="#bb9af7"
 
 ## 安全与健壮性
 
-`btop-rs` 把从其他进程读到的数据视为不可信输入：
+`rtop` 把从其他进程读到的数据视为不可信输入：
 
 - **终端注入防护**：进程名、命令行、用户名、挂载点、网卡名和地址在绘制前都会经过
   ANSI/控制字符/双向控制字符转义。ESC、C0/C1 控制符、双向覆盖字符和零宽方向标记

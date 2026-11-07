@@ -8,8 +8,32 @@ permissions:
   contents: write
 
 jobs:
+  validate:
+    name: Validate tag and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check tag matches Cargo.toml
+        shell: bash
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
+          test -n "$version"
+          test "${GITHUB_REF_NAME#v}" = "$version"
+          echo "Releasing rtop v$version"
+
+      - name: Run tests
+        run: cargo test --locked --all-targets
+
   build:
     name: ${{ matrix.artifact }}
+    needs: validate
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -17,16 +41,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: btop-rs-linux-x86_64
-          - os: macos-14
+            artifact: rtop-linux-x86_64
+          - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: btop-rs-macos-aarch64
-          - os: macos-15-intel
+            artifact: rtop-macos-aarch64
+          - os: macos-latest
             target: x86_64-apple-darwin
-            artifact: btop-rs-macos-x86_64
+            artifact: rtop-macos-x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: btop-rs-windows-x86_64
+            artifact: rtop-windows-x86_64
     steps:
       - uses: actions/checkout@v4
 
@@ -48,18 +72,18 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp "target/${{ matrix.target }}/release/btop-rs" dist/btop-rs
-          tar -C dist -czf "dist/${{ matrix.artifact }}.tar.gz" btop-rs
-          rm dist/btop-rs
+          cp "target/${{ matrix.target }}/release/rtop" dist/rtop
+          tar -C dist -czf "dist/${{ matrix.artifact }}.tar.gz" rtop
+          rm dist/rtop
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/btop-rs.exe" "dist/btop-rs.exe"
-          Compress-Archive -Path "dist/btop-rs.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip"
-          Remove-Item "dist/btop-rs.exe"
+          Copy-Item "target/${{ matrix.target }}/release/rtop.exe" "dist/rtop.exe"
+          Compress-Archive -Path "dist/rtop.exe" -DestinationPath "dist/${{ matrix.artifact }}.zip"
+          Remove-Item "dist/rtop.exe"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -77,9 +101,16 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Create checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum rtop-* > SHA256SUMS
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          name: rtop ${{ github.ref_name }}
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true

@@ -30,4 +30,4 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
-[0.1.0]: https://github.com/summertools/btop-rs/releases/tag/v0.1.0
+[0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0

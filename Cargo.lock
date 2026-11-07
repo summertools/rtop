@@ -59,23 +59,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
-name = "btop-rs"
-version = "0.1.0"
-dependencies = [
- "clap",
- "crossterm",
- "dirs",
- "libc",
- "serde",
- "signal-hook",
- "sysinfo",
- "tempfile",
- "toml",
- "unicode-width",
- "windows-sys",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -414,6 +397,23 @@ checksum = "60dc65c0ff1a7ae1294b0c67b9f14baf70b644404010370171787bfac1038fc0"
 dependencies = [
  "libredox",
  "thiserror",
+]
+
+[[package]]
+name = "rtop"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "crossterm",
+ "dirs",
+ "libc",
+ "serde",
+ "signal-hook",
+ "sysinfo",
+ "tempfile",
+ "toml",
+ "unicode-width",
+ "windows-sys",
 ]
 
 [[package]]

@@ -130,7 +130,7 @@ fn draw_header(canvas: &mut Canvas, app: &App, rect: Rect) -> Vec<(Preset, Rect)
         rect,
         x,
         rect.y,
-        "btop-rs",
+        "rtop",
         theme.background,
         theme.title,
         true,
@@ -510,7 +510,7 @@ fn draw_footer(canvas: &mut Canvas, app: &App, rect: Rect) {
 fn draw_too_small(canvas: &mut Canvas, app: &App, width: u16, height: u16) {
     let theme = &app.theme;
     let lines: Vec<(String, Style)> = vec![
-        ("btop-rs".to_owned(), Style::fg(theme.title).bold()),
+        ("rtop".to_owned(), Style::fg(theme.title).bold()),
         (String::new(), Style::default()),
         (
             "terminal too small".to_owned(),

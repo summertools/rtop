@@ -1,10 +1,10 @@
-# btop-rs
+# rtop
 
 **A fast, elegant terminal system monitor in Rust — CPU, memory, disks, network, and processes on Linux, macOS, and Windows.**
 
 English | [简体中文](README.zh-CN.md)
 
-`btop-rs` is a native Rust take on the btop experience. It samples the system
+`rtop` is a native Rust take on the btop experience. It samples the system
 through a small, typed snapshot layer, gives every view a calm gradient-driven
 design, and keeps terminal input and output defensive by default. It is a
 single binary with no runtime services and no shell commands.
@@ -52,7 +52,7 @@ single binary with no runtime services and no shell commands.
 ## Screenshot
 
 ```text
-  btop-rs   0 all   1 cpu   2 mem   3 net   4 proc                                      ? 14:32:08
+  rtop   0 all   1 cpu   2 mem   3 net   4 proc                                      ? 14:32:08
  mybox · you · Linux (Fedora 42)  AMD Ryzen 7 7700   up 03:42:10 · load 1.24 0.98 0.74 · 3.80 GHz
 ╭─ cpu 27%  8 cores──────────────────────────────╮╭─ mem 61%  9.8 GiB / 16.0 GiB────────────────╮
 │27%  avg 22%  peak 64%              100% C0 ⣿⣿⣿⣿⣤⣀   41% ││Used      █████████████▎░░░░░░░   9.8 GiB  61%│
@@ -113,29 +113,31 @@ Build and install from this repository:
 
 ```bash
 cargo install --path .
-btop-rs
+rtop
 ```
 
 Or install directly from Git:
 
 ```bash
-cargo install --git https://github.com/summertools/btop-rs.git
+cargo install --git https://github.com/summertools/rtop.git
 ```
 
 For local development:
 
 ```bash
 cargo build --release
-./target/release/btop-rs
+./target/release/rtop
 ```
 
-Release archives contain a single `btop-rs` executable (`btop-rs.exe` on
-Windows).
+Release archives contain a single `rtop` executable (`rtop.exe` on
+Windows). The release workflow publishes `rtop-linux-x86_64.tar.gz`,
+`rtop-macos-aarch64.tar.gz`, `rtop-macos-x86_64.tar.gz`, and
+`rtop-windows-x86_64.zip`, plus a `SHA256SUMS` file for integrity checks.
 
 ## Usage
 
 ```text
-btop-rs [OPTIONS]
+rtop [OPTIONS]
 ```
 
 | Option | Description |
@@ -160,7 +162,7 @@ btop-rs [OPTIONS]
 a server or in CI:
 
 ```bash
-btop-rs --dump --width 100 --height 30 --preset 1
+rtop --dump --width 100 --height 30 --preset 1
 ```
 
 ### Environment variables
@@ -209,9 +211,9 @@ absent. Locations:
 
 | Platform | Path |
 | --- | --- |
-| Linux | `$XDG_CONFIG_HOME/btop-rs/btop-rs.toml`, otherwise `~/.config/btop-rs/btop-rs.toml` |
-| macOS | `~/Library/Application Support/btop-rs/btop-rs.toml` |
-| Windows | `%APPDATA%\btop-rs\btop-rs.toml` |
+| Linux | `$XDG_CONFIG_HOME/rtop/rtop.toml`, otherwise `~/.config/rtop/rtop.toml` |
+| macOS | `~/Library/Application Support/rtop/rtop.toml` |
+| Windows | `%APPDATA%\rtop\rtop.toml` |
 
 Example:
 
@@ -254,10 +256,10 @@ compatibility. Configuration and theme files are limited to 128 KiB.
 Built-in themes: `default` (Tokyo Night), `dracula`, `gruvbox`, `nord`,
 `catppuccin`, `light`, and `tty`.
 
-User themes live in the platform configuration directory under `btop-rs/themes/`
-(for example `~/.config/btop-rs/themes/` on Linux,
-`~/Library/Application Support/btop-rs/themes/` on macOS, or
-`%APPDATA%\btop-rs\themes\` on Windows) and use btop's familiar syntax:
+User themes live in the platform configuration directory under `rtop/themes/`
+(for example `~/.config/rtop/themes/` on Linux,
+`~/Library/Application Support/rtop/themes/` on macOS, or
+`%APPDATA%\rtop\themes\` on Windows) and use btop's familiar syntax:
 
 ```text
 theme[main_bg]="#0b0e14"
@@ -278,7 +280,7 @@ btop themes can be copied into the theme directory and selected with
 
 ## Security and robustness
 
-Terminal monitors read a lot of data controlled by other processes. `btop-rs`
+Terminal monitors read a lot of data controlled by other processes. `rtop`
 treats that data as untrusted:
 
 - **Terminal injection:** process names, command lines, users, mount points,

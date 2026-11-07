@@ -1,4 +1,4 @@
-//! `btop-rs` — a fast, elegant terminal system monitor.
+//! `rtop` — a fast, elegant terminal system monitor.
 //!
 //! The crate is split into a platform layer that samples the operating
 //! system, a small terminal drawing layer, and an application/UI layer.

@@ -905,7 +905,7 @@ pub fn signal_process(
     }
     if let Ok(current) = sysinfo::get_current_pid() {
         if current.as_u32() == pid {
-            return Err("refusing to signal btop-rs itself".to_owned());
+            return Err("refusing to signal rtop itself".to_owned());
         }
     }
 

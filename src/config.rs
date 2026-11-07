@@ -176,13 +176,13 @@ impl Config {
     /// macOS, `%APPDATA%` on Windows).
     #[must_use]
     pub fn default_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|dir| dir.join("btop-rs").join("btop-rs.toml"))
+        dirs::config_dir().map(|dir| dir.join("rtop").join("rtop.toml"))
     }
 
     /// Directory containing user-supplied `.theme` files.
     #[must_use]
     pub fn theme_dir() -> Option<PathBuf> {
-        dirs::config_dir().map(|dir| dir.join("btop-rs").join("themes"))
+        dirs::config_dir().map(|dir| dir.join("rtop").join("themes"))
     }
 
     /// Load configuration.
