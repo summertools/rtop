@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 
 use rtop::app::{App, Overlay, Preset, ToastLevel};
-use rtop::config::{Config, GraphSymbol};
+use rtop::config::{Config, GraphSymbol, MemStyle};
 use rtop::format;
 use rtop::platform::{
     BatteryInfo, BatteryState, CpuBreakdown, CpuSnapshot, DiskSnapshot, GpuSnapshot, GpuVendor,
@@ -250,6 +250,37 @@ fn all_presets_render_without_overflow() {
             }
         }
     }
+}
+
+#[test]
+fn memory_gauges_support_dotted_and_block_styles() {
+    let mut dotted = app(Config {
+        preset: 2,
+        mem_style: MemStyle::Dots,
+        ..Config::default()
+    });
+    dotted.preset = Preset::Memory;
+    let (canvas, _) = ui::render(&dotted, 120, 36);
+    let used = canvas
+        .plain()
+        .lines()
+        .find(|line| line.contains("Used"))
+        .expect("Used row")
+        .to_owned();
+    assert!(used.contains('●'), "dotted Used row: {used}");
+    assert!(!used.contains('█'), "dotted row contains blocks: {used}");
+
+    let mut blocks = dotted.clone();
+    blocks.config.mem_style = MemStyle::Blocks;
+    let (canvas, _) = ui::render(&blocks, 120, 36);
+    let used = canvas
+        .plain()
+        .lines()
+        .find(|line| line.contains("Used"))
+        .expect("Used row")
+        .to_owned();
+    assert!(used.contains('█'), "block Used row: {used}");
+    assert!(!used.contains('●'), "block row contains dots: {used}");
 }
 
 #[test]

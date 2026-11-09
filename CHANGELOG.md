@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-11-09
+
+### Added
+
+- New **Sakura** built-in theme: deep plum background with rose, mint, and
+  lavender accents.
+- Dotted memory gauges (`mem_style = "dots"`, the default): filled samples use
+  round dots with a subtle dotted track, and cached memory uses a distinct
+  ring-dot glyph. `mem_style = "blocks"` restores the previous solid bars for
+  users who prefer them.
+
+### Changed
+
+- Memory composition, metric rows, and the disk section in the memory panel all
+  follow the selected gauge style, including a pure-ASCII TTY fallback.
+- README/docs screenshots and theme lists updated for the new palette and
+  dotted memory treatment.
+
+[0.1.3]: https://github.com/summertools/rtop/releases/tag/v0.1.3
+
 ## [0.1.2] - 2026-11-09
 
 ### Added

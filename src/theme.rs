@@ -242,6 +242,7 @@ impl Theme {
             "gruvbox" | "gruvbox-dark" => Self::gruvbox(),
             "nord" => Self::nord(),
             "catppuccin" | "catppuccin-mocha" => Self::catppuccin(),
+            "sakura" => Self::sakura(),
             "light" => Self::light(),
             "tty" | "mono" | "monochrome" => Self::monochrome(),
             _ => return None,
@@ -258,6 +259,7 @@ impl Theme {
             "gruvbox",
             "nord",
             "catppuccin",
+            "sakura",
             "light",
             "tty",
         ]
@@ -494,6 +496,53 @@ impl Theme {
                 Rgb::new(0xa6, 0xe3, 0xa1),
                 Rgb::new(0xf9, 0xe2, 0xaf),
                 Rgb::new(0xf3, 0x8b, 0xa8),
+            ),
+        }
+    }
+
+    fn sakura() -> Self {
+        Self {
+            name: "sakura".to_owned(),
+            background: Rgb::new(0x17, 0x13, 0x21),
+            foreground: Rgb::new(0xf3, 0xe9, 0xf4),
+            dim: Rgb::new(0x8b, 0x7c, 0x9e),
+            title: Rgb::new(0xf4, 0xa7, 0xc3),
+            accent: Rgb::new(0x9b, 0xe7, 0xd8),
+            border: Rgb::new(0x3d, 0x33, 0x52),
+            highlight_bg: Rgb::new(0x33, 0x2a, 0x46),
+            highlight_fg: Rgb::new(0xff, 0xf7, 0xfb),
+            good: Rgb::new(0xa7, 0xe8, 0xbd),
+            warning: Rgb::new(0xf4, 0xcf, 0x8b),
+            critical: Rgb::new(0xff, 0x7e, 0x9d),
+            cpu: Gradient::new(
+                Rgb::new(0x8b, 0xe9, 0xfd),
+                Rgb::new(0xb7, 0xa6, 0xf7),
+                Rgb::new(0xf5, 0xa9, 0xc4),
+            ),
+            memory: Gradient::new(
+                Rgb::new(0x9b, 0xe7, 0xb9),
+                Rgb::new(0xf4, 0xcf, 0x8b),
+                Rgb::new(0xff, 0x8f, 0xa8),
+            ),
+            disk: Gradient::new(
+                Rgb::new(0x8b, 0xe9, 0xfd),
+                Rgb::new(0xb7, 0xa6, 0xf7),
+                Rgb::new(0xf5, 0xa9, 0xc4),
+            ),
+            net_down: Gradient::new(
+                Rgb::new(0x7e, 0xe7, 0xd8),
+                Rgb::new(0x8b, 0xe9, 0xfd),
+                Rgb::new(0xaa, 0xb8, 0xff),
+            ),
+            net_up: Gradient::new(
+                Rgb::new(0xf5, 0xa9, 0xc4),
+                Rgb::new(0xd8, 0xa7, 0xf4),
+                Rgb::new(0xff, 0x8f, 0xa8),
+            ),
+            temp: Gradient::new(
+                Rgb::new(0x9b, 0xe7, 0xb9),
+                Rgb::new(0xf4, 0xcf, 0x8b),
+                Rgb::new(0xff, 0x8f, 0xa8),
             ),
         }
     }

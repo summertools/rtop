@@ -44,7 +44,7 @@ single binary with no runtime services and no shell commands.
 - Best-effort GPU monitoring: utilisation, VRAM, temperature, power, clocks,
   fans, and history. NVIDIA uses NVML on Linux and Windows; AMD/Intel use the
   Linux DRM/hwmon sysfs interfaces.
-- Seven built-in themes and btop-compatible user `.theme` files.
+- Eight built-in themes (including the new **Sakura** palette) and btop-compatible user `.theme` files. Dotted memory gauges are the default and can be switched back to solid blocks with `mem_style = "blocks"`.
 - Full mouse support: clickable tabs, process rows, interface rows, and wheel
   scrolling.
 - `--dump` renders one frame without a TTY, which is useful in CI, scripts, and
@@ -59,13 +59,13 @@ single binary with no runtime services and no shell commands.
   rtop   0 all   1 cpu   2 mem   3 net   4 proc                                      ? 14:32:08
  mybox · you · Linux (Fedora 42)  AMD Ryzen 7 7700   up 03:42:10 · load 1.24 0.98 0.74 · 3.80 GHz
 ╭─ cpu 27%  8 cores──────────────────────────────╮╭─ mem 61%  9.8 GiB / 16.0 GiB────────────────╮
-│27%  avg 22%  peak 64%              100% C0 ⣿⣿⣿⣿⣤⣀   41% ││Used      █████████████▎░░░░░░░   9.8 GiB  61%│
-│                                        C1 ⣿⣦⣀⣀⣀⣀   18% ││Available ███████▊░░░░░░░░░░░   6.2 GiB  39%│
-│                                    50% C2 ⣿⣿⣶⣀⣀⣀   33% ││Cached    ████▏░░░░░░░░░░░░░░   2.1 GiB  13%│
-│                                        C3 ⣤⣀⣀⣀⣀⣀    9% ││Free      ██████▎░░░░░░░░░░░░   4.1 GiB  26%│
-│                                        C4 ⣶⣤⣀⣀⣀⣀   24% ││Swap      ██▏░░░░░░░░░░░░░░░░   1.0/8.0G  13%│
+│27%  avg 22%  peak 64%              100% C0 ⣿⣿⣿⣿⣤⣀   41% ││Used      ●●●●●●●●●●●●●●·······   9.8 GiB  61%│
+│                                        C1 ⣿⣦⣀⣀⣀⣀   18% ││Available ●●●●●●●●···········   6.2 GiB  39%│
+│                                    50% C2 ⣿⣿⣶⣀⣀⣀   33% ││Cached    ●●●●●··············   2.1 GiB  13%│
+│                                        C3 ⣤⣀⣀⣀⣀⣀    9% ││Free      ●●●●●●●············   4.1 GiB  26%│
+│                                        C4 ⣶⣤⣀⣀⣀⣀   24% ││Swap      ●●●················   1.0/8.0G  13%│
 │⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⠉⠉⠉⠉⠒⠒⠒⠒⠤⠤⣀⣀⣀⣀⠉⠉⠒⠒⠤⣀     0% ││disk                     R 18.4 MiB/s  W 2.1 MiB/s│
-│usr 12%  sys 9%  wait 1%  idle 78%              ││/         ████████████████▍░░░░░░  58%     412G/710G│
+│usr 12%  sys 9%  wait 1%  idle 78%              ││/         ●●●●●●●●●●●●●●●●●······  58%     412G/710G│
 ╰────────────────────────────────────────────────╯╰─────────────────────────────────────────────────╯
 ╭─ net wlan0  ↓ 24.8 MiB/s  ↑ 1.2 MiB/s──────────────────────────────────────────────────────────────────────────────╮
 │↓ download 24.8 MiB/s (208 Mbit/s)                                                              total 84.2 GiB     │
@@ -75,8 +75,8 @@ single binary with no runtime services and no shell commands.
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ proc 186/186  cpu ↓  12 run─────────────────────────────────────────────────────────────────────────────────────────╮
 │ R    812 firefox            /usr/lib/firefox/firefox                                     you          1.4G ██▍  12.4 │
-│ S   1021 terminal           /usr/bin/alacritty                                           you          184M █▏    5.8 │
-│ S   1044 code               /usr/share/code/code --type=renderer                        you          912M █▏    4.1 │
+│ S   1021 terminal           /usr/bin/alacritty                                           you          184M ██    5.8 │
+│ S   1044 code               /usr/share/code/code --type=renderer                        you          912M ██    4.1 │
 │ S      1 systemd            /usr/lib/systemd/systemd --switched-root --system            root         14M ░     0.0 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ↑↓ move  ←→ sort  Enter info  f filter  r reverse  t tree  k kill  ? help  q quit
@@ -261,7 +261,7 @@ rounded_corners = true
 theme_background = false
 show_battery = true
 show_gpu = true         # GPU view and summary when a device is detected
-
+mem_style = "dots"      # dots | blocks (memory gauges)
 proc_sort = "cpu"       # cpu, memory, pid, name, user
 proc_tree = false
 proc_reversed = false
@@ -280,7 +280,9 @@ compatibility. Configuration and theme files are limited to 128 KiB.
 ## Themes
 
 Built-in themes: `default` (Tokyo Night), `dracula`, `gruvbox`, `nord`,
-`catppuccin`, `light`, and `tty`.
+`catppuccin`, `sakura`, `light`, and `tty`. **Sakura** is a deep plum palette
+with rose, mint, and lavender accents; it pairs particularly well with the
+default dotted memory gauges.
 
 User themes live in the platform configuration directory under `rtop/themes/`
 (for example `~/.config/rtop/themes/` on Linux,

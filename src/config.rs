@@ -116,6 +116,17 @@ impl fmt::Display for ProcSort {
     }
 }
 
+/// Memory gauge glyph style.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MemStyle {
+    /// Round dots with a subtle dotted track.
+    #[default]
+    Dots,
+    /// Solid blocks and a dim block track.
+    Blocks,
+}
+
 /// User-visible configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -141,6 +152,8 @@ pub struct Config {
     pub show_battery: bool,
     /// Show the GPU view and GPU summary when a device is detected.
     pub show_gpu: bool,
+    /// Memory gauge glyph style.
+    pub mem_style: MemStyle,
     /// Default process sort.
     pub proc_sort: ProcSort,
     /// Start with the process tree enabled.
@@ -172,6 +185,7 @@ impl Default for Config {
             theme_background: false,
             show_battery: true,
             show_gpu: true,
+            mem_style: MemStyle::Dots,
             proc_sort: ProcSort::Cpu,
             proc_tree: false,
             proc_reversed: false,
@@ -375,6 +389,7 @@ mod tests {
         assert_eq!(config.update_ms, 1_000);
         assert!(!config.read_only);
         assert!(config.show_gpu);
+        assert_eq!(config.mem_style, MemStyle::Dots);
         assert!(config.validate().is_empty());
     }
 

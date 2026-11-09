@@ -1,6 +1,7 @@
 //! Memory, swap, and disk panel.
 
 use crate::app::App;
+use crate::config::MemStyle;
 use crate::format;
 use crate::theme::{Gradient, Style};
 use crate::ui::canvas::{Align, Canvas, Rect};
@@ -14,6 +15,7 @@ struct Metric {
 
 pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     let theme = &app.theme;
+    let dots = app.config.mem_style == MemStyle::Dots;
     let Some(snapshot) = app.snapshot.as_ref() else {
         let inner = super::panel(canvas, app, rect, "mem", !compact, None);
         super::placeholder(canvas, app, inner, "collecting memory data…");
@@ -73,7 +75,7 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     };
     let left = composition.1;
     if let Some(strip) = composition.0 {
-        draw_composition(canvas, app, strip, memory);
+        draw_composition(canvas, app, strip, memory, dots);
     }
     if compact {
         let disk_h = if show_disks {
@@ -198,6 +200,7 @@ fn draw_composition(
     app: &App,
     rect: Rect,
     memory: &crate::platform::MemorySnapshot,
+    dots: bool,
 ) {
     if rect.is_empty() || memory.total == 0 || rect.w < 12 {
         return;
@@ -223,16 +226,28 @@ fn draw_composition(
     };
     let used_cells = to_cells(used);
     let cached_cells = to_cells(cached).min(bar.w.saturating_sub(used_cells));
+    let tty = app.graph_symbol() == crate::config::GraphSymbol::Tty;
+    let (used_ch, cached_ch, free_ch) = if dots {
+        if tty {
+            ('o', 'O', '.')
+        } else {
+            ('●', '◉', '·')
+        }
+    } else if tty {
+        ('#', '#', '-')
+    } else {
+        ('█', '▓', '░')
+    };
     for index in 0..bar.w {
         let (ch, style) = if index < used_cells {
             (
-                '█',
+                used_ch,
                 Style::fg(theme.memory.at(f32::from(index) / f32::from(bar.w.max(1)))),
             )
         } else if index < used_cells + cached_cells {
-            ('▓', Style::fg(theme.disk.at(0.55)))
+            (cached_ch, Style::fg(theme.disk.at(0.55)))
         } else {
-            ('░', Style::fg(theme.border))
+            (free_ch, Style::fg(theme.border))
         };
         canvas.put(bar.x + index, bar.y, ch, style);
     }
@@ -244,15 +259,14 @@ fn draw_metrics(canvas: &mut Canvas, app: &App, rect: Rect, metrics: &[Metric]) 
     }
     let rows = usize::from(rect.h).min(metrics.len());
     for (index, metric) in metrics.iter().take(rows).enumerate() {
-        crate::ui::widgets::meter_row(
+        draw_mem_meter(
             canvas,
+            app,
             Rect::new(rect.x, rect.y + index as u16, rect.w, 1),
             metric.label,
             &metric.value,
             metric.ratio,
             metric.gradient,
-            &app.theme,
-            app.graph_symbol() == crate::config::GraphSymbol::Tty,
         );
     }
     if rows == 0 {
@@ -435,15 +449,14 @@ fn draw_disks(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     for disk in disks.iter().take(rows_available) {
         let row = Rect::new(rect.x, rect.y + 1 + drawn as u16, rect.w, 1);
         if compact {
-            crate::ui::widgets::meter_row(
+            draw_mem_meter(
                 canvas,
+                app,
                 row,
                 &disk.mount,
                 &format::bytes_short(disk.used),
                 disk.used as f32 / disk.total.max(1) as f32,
                 theme.disk,
-                theme,
-                app.graph_symbol() == crate::config::GraphSymbol::Tty,
             );
         } else {
             draw_disk_row(canvas, app, row, disk);
@@ -461,6 +474,40 @@ fn draw_disks(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
                 Style::fg(theme.dim).dim(),
             );
         }
+    }
+}
+
+fn draw_mem_meter(
+    canvas: &mut Canvas,
+    app: &App,
+    rect: Rect,
+    label: &str,
+    value: &str,
+    ratio: f32,
+    gradient: Gradient,
+) {
+    if app.config.mem_style == MemStyle::Dots {
+        crate::ui::widgets::dot_meter_row(
+            canvas,
+            rect,
+            label,
+            value,
+            ratio,
+            gradient,
+            &app.theme,
+            app.graph_symbol() == crate::config::GraphSymbol::Tty,
+        );
+    } else {
+        crate::ui::widgets::meter_row(
+            canvas,
+            rect,
+            label,
+            value,
+            ratio,
+            gradient,
+            &app.theme,
+            app.graph_symbol() == crate::config::GraphSymbol::Tty,
+        );
     }
 }
 
@@ -485,14 +532,26 @@ fn draw_disk_row(canvas: &mut Canvas, app: &App, rect: Rect, disk: &crate::platf
     canvas.text(rect, x, rect.y, &label, Style::fg(theme.foreground));
     x = rect.x + label_w + 1;
     if bar_w >= 4 {
-        crate::ui::widgets::bar(
-            canvas,
-            Rect::new(x, rect.y, bar_w, 1),
-            ratio,
-            theme.disk,
-            theme,
-            app.graph_symbol() == crate::config::GraphSymbol::Tty,
-        );
+        let bar_rect = Rect::new(x, rect.y, bar_w, 1);
+        if app.config.mem_style == MemStyle::Dots {
+            crate::ui::widgets::dot_bar(
+                canvas,
+                bar_rect,
+                ratio,
+                theme.disk,
+                theme,
+                app.graph_symbol() == crate::config::GraphSymbol::Tty,
+            );
+        } else {
+            crate::ui::widgets::bar(
+                canvas,
+                bar_rect,
+                ratio,
+                theme.disk,
+                theme,
+                app.graph_symbol() == crate::config::GraphSymbol::Tty,
+            );
+        }
     }
     let percent_x = rect.right().saturating_sub(io_w + value_w + percent_w + 1);
     canvas.text_aligned(

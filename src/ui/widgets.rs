@@ -45,6 +45,39 @@ pub fn bar(
     }
 }
 
+/// A dotted meter used by the memory panel. Filled samples are round dots;
+/// the empty track uses small middle dots so the gauge reads as a row of beads
+/// instead of a solid block. The TTY variant stays pure ASCII.
+pub fn dot_bar(
+    canvas: &mut Canvas,
+    rect: Rect,
+    ratio: f32,
+    gradient: Gradient,
+    theme: &Theme,
+    tty: bool,
+) {
+    if rect.is_empty() || rect.h == 0 {
+        return;
+    }
+    let ratio = if ratio.is_finite() {
+        ratio.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let width = f32::from(rect.w);
+    let filled = (ratio * width).round().clamp(0.0, width) as u16;
+    let (on, off) = if tty { ('o', '.') } else { ('●', '·') };
+    for index in 0..rect.w {
+        let position = (f32::from(index) + 1.0) / width;
+        let (ch, style) = if index < filled {
+            (on, Style::fg(gradient.at(position)))
+        } else {
+            (off, Style::fg(theme.border))
+        };
+        canvas.put(rect.x + index, rect.y, ch, style);
+    }
+}
+
 /// A compact metric row: label, bar, value, percentage.
 pub fn meter_row(
     canvas: &mut Canvas,
@@ -55,6 +88,38 @@ pub fn meter_row(
     gradient: Gradient,
     theme: &Theme,
     tty: bool,
+) {
+    meter_row_impl(
+        canvas, rect, label, value, ratio, gradient, theme, tty, false,
+    );
+}
+
+/// Like [`meter_row`], but draws the gauge with dots.
+pub fn dot_meter_row(
+    canvas: &mut Canvas,
+    rect: Rect,
+    label: &str,
+    value: &str,
+    ratio: f32,
+    gradient: Gradient,
+    theme: &Theme,
+    tty: bool,
+) {
+    meter_row_impl(
+        canvas, rect, label, value, ratio, gradient, theme, tty, true,
+    );
+}
+
+fn meter_row_impl(
+    canvas: &mut Canvas,
+    rect: Rect,
+    label: &str,
+    value: &str,
+    ratio: f32,
+    gradient: Gradient,
+    theme: &Theme,
+    tty: bool,
+    dots: bool,
 ) {
     if rect.is_empty() || rect.h == 0 || rect.w < 12 {
         return;
@@ -79,14 +144,12 @@ pub fn meter_row(
     let bar_w = remaining.saturating_sub(percent_w + value_w + 3).min(80);
     if bar_w >= 4 {
         canvas.text(rect, x, rect.y, " ", Style::plain());
-        bar(
-            canvas,
-            Rect::new(x + 1, rect.y, bar_w, 1),
-            ratio,
-            gradient,
-            theme,
-            tty,
-        );
+        let bar_rect = Rect::new(x + 1, rect.y, bar_w, 1);
+        if dots {
+            dot_bar(canvas, bar_rect, ratio, gradient, theme, tty);
+        } else {
+            bar(canvas, bar_rect, ratio, gradient, theme, tty);
+        }
         x = x.saturating_add(bar_w + 1);
     }
     let value_x = rect.right().saturating_sub(percent_w + value_w + 1);
@@ -332,6 +395,58 @@ mod tests {
         let theme = theme();
         scrollbar(&mut canvas, Rect::new(2, 0, 1, 5), 0, 2, 10, &theme, false);
         assert!(canvas.plain().contains('┃'));
+    }
+
+    #[test]
+    fn dot_bar_has_a_light_dotted_track_and_respects_ratio() {
+        let mut canvas = Canvas::new(10, 1);
+        let theme = theme();
+        dot_bar(
+            &mut canvas,
+            Rect::new(0, 0, 10, 1),
+            0.5,
+            theme.memory,
+            &theme,
+            false,
+        );
+        let plain = canvas.plain();
+        assert_eq!(plain.chars().filter(|c| *c == '●').count(), 5);
+        assert_eq!(plain.chars().filter(|c| *c == '·').count(), 5);
+        assert!(!plain.contains('█'));
+    }
+
+    #[test]
+    fn dot_bar_tty_variant_is_ascii() {
+        let mut canvas = Canvas::new(8, 1);
+        let theme = theme();
+        dot_bar(
+            &mut canvas,
+            Rect::new(0, 0, 8, 1),
+            0.25,
+            theme.memory,
+            &theme,
+            true,
+        );
+        let plain = canvas.plain();
+        assert_eq!(plain, "oo......");
+        assert!(plain.is_ascii());
+    }
+
+    #[test]
+    fn dot_bar_never_draws_outside_its_rectangle() {
+        let mut canvas = Canvas::new(10, 2);
+        let theme = theme();
+        dot_bar(
+            &mut canvas,
+            Rect::new(2, 1, 5, 1),
+            2.0,
+            theme.memory,
+            &theme,
+            false,
+        );
+        assert_eq!(canvas.cell(1, 1).ch, ' ');
+        assert_eq!(canvas.cell(7, 1).ch, ' ');
+        assert_eq!(canvas.plain().matches('●').count(), 5);
     }
 
     #[test]

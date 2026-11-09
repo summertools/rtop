@@ -69,6 +69,7 @@ fn list_themes_works_without_a_terminal() {
         "gruvbox",
         "nord",
         "catppuccin",
+        "sakura",
         "light",
         "tty",
     ] {

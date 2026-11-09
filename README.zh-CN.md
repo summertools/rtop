@@ -36,7 +36,8 @@
   `←`/`→` 快速切换排序字段，Linux 线程任务不会再被重复显示为多个进程。
 - 尽力提供 GPU 监控：占用率、显存、温度、功耗、频率、风扇与历史曲线。Linux/Windows
   的 NVIDIA 设备通过 NVML 读取，Linux 的 AMD/Intel 设备通过 DRM/hwmon sysfs 读取。
-- 7 个内置主题，并兼容 btop 的 `.theme` 用户主题文件。
+- 8 个内置主题（含新的 **Sakura** 主题），并兼容 btop 的 `.theme` 用户主题文件。
+  内存计量默认使用点状样式，可通过 `mem_style = "blocks"` 切回实心方块。
 - 完整鼠标支持：点击标签页、进程行、网卡行以及滚轮滚动。
 - `--dump` 可在没有 TTY 的环境渲染一帧，适合 CI、脚本和截图。
 - 不执行 shell、不访问网络、限制文件读取大小、转义 ANSI/双向控制字符、
@@ -48,12 +49,12 @@
   rtop   0 总览   1 cpu   2 内存   3 网络   4 进程                              ? 14:32:08
  mybox · you · Linux (Fedora 42)  AMD Ryzen 7 7700   up 03:42:10 · load 1.24 0.98 0.74 · 3.80 GHz
 ╭─ cpu 27%  8 cores──────────────────────────────╮╭─ mem 61%  9.8 GiB / 16.0 GiB────────────────╮
-│27%  avg 22%  peak 64%              100% C0 ⣿⣿⣿⣿⣤⣀   41% ││Used      █████████████▎░░░░░░░   9.8 GiB  61%│
-│                                        C1 ⣿⣦⣀⣀⣀⣀   18% ││Available ███████▊░░░░░░░░░░░   6.2 GiB  39%│
-│                                    50% C2 ⣿⣿⣶⣀⣀⣀   33% ││Cached    ████▏░░░░░░░░░░░░░░   2.1 GiB  13%│
-│                                        C3 ⣤⣀⣀⣀⣀⣀    9% ││Free      ██████▎░░░░░░░░░░░░   4.1 GiB  26%│
+│27%  avg 22%  peak 64%              100% C0 ⣿⣿⣿⣿⣤⣀   41% ││Used      ●●●●●●●●●●●●●●·······   9.8 GiB  61%│
+│                                        C1 ⣿⣦⣀⣀⣀⣀   18% ││Available ●●●●●●●●···········   6.2 GiB  39%│
+│                                    50% C2 ⣿⣿⣶⣀⣀⣀   33% ││Cached    ●●●●●··············   2.1 GiB  13%│
+│                                        C3 ⣤⣀⣀⣀⣀⣀    9% ││Free      ●●●●●●●············   4.1 GiB  26%│
 │⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⠉⠉⠒⠒⠤⣀⣀⣀⣀⠉⠒⠒⠤⣀     0% ││disk                     R 18.4 MiB/s  W 2.1 MiB/s│
-│usr 12%  sys 9%  wait 1%  idle 78%              ││/         ████████████████▍░░░░  58%     412G/710G│
+│usr 12%  sys 9%  wait 1%  idle 78%              ││/         ●●●●●●●●●●●●●●●●●······  58%     412G/710G│
 ╰────────────────────────────────────────────────╯╰─────────────────────────────────────────────────╯
 ╭─ net wlan0  ↓ 24.8 MiB/s  ↑ 1.2 MiB/s──────────────────────────────────────────────────────────────────────────────╮
 │↓ download 24.8 MiB/s (208 Mbit/s)                                                              total 84.2 GiB     │
@@ -223,7 +224,7 @@ rounded_corners = true
 theme_background = false
 show_battery = true
 show_gpu = true         # 检测到设备时显示 GPU 视图与摘要
-
+mem_style = "dots"      # dots | blocks（内存计量样式）
 proc_sort = "cpu"       # cpu、memory、pid、name、user
 proc_tree = false
 proc_reversed = false
@@ -241,7 +242,8 @@ show_key_hints = true
 ## 主题
 
 内置主题：`default`（Tokyo Night）、`dracula`、`gruvbox`、`nord`、`catppuccin`、
-`light`、`tty`。
+`sakura`、`light`、`tty`。**Sakura** 使用深梅色背景与玫瑰、薄荷、薰衣草色调，
+特别适合默认的点状内存计量。
 
 用户主题放在平台配置目录下的 `rtop/themes/`（例如 Linux 的
 `~/.config/rtop/themes/`、macOS 的
