@@ -97,6 +97,17 @@ impl ProcSort {
             Self::User => Self::Cpu,
         }
     }
+
+    #[must_use]
+    pub const fn previous(self) -> Self {
+        match self {
+            Self::Cpu => Self::User,
+            Self::Memory => Self::Cpu,
+            Self::Pid => Self::Memory,
+            Self::Name => Self::Pid,
+            Self::User => Self::Name,
+        }
+    }
 }
 
 impl fmt::Display for ProcSort {
@@ -112,7 +123,7 @@ pub struct Config {
     /// Refresh interval in milliseconds. Clamped to `250..=10_000`.
     pub update_ms: u64,
     /// Initial preset: `0` overview, `1` CPU, `2` memory/disks, `3` network,
-    /// `4` processes.
+    /// `4` processes, `5` GPUs.
     pub preset: u8,
     /// Graph character set.
     pub graph_symbol: GraphSymbol,
@@ -128,6 +139,8 @@ pub struct Config {
     pub theme_background: bool,
     /// Show the battery indicator when the platform exposes one.
     pub show_battery: bool,
+    /// Show the GPU view and GPU summary when a device is detected.
+    pub show_gpu: bool,
     /// Default process sort.
     pub proc_sort: ProcSort,
     /// Start with the process tree enabled.
@@ -158,6 +171,7 @@ impl Default for Config {
             rounded_corners: true,
             theme_background: false,
             show_battery: true,
+            show_gpu: true,
             proc_sort: ProcSort::Cpu,
             proc_tree: false,
             proc_reversed: false,
@@ -251,8 +265,8 @@ impl Config {
             ));
             self.update_ms = 1_000;
         }
-        if self.preset > 4 {
-            warnings.push(format!("preset {} is outside 0..=4; using 0", self.preset));
+        if self.preset > 5 {
+            warnings.push(format!("preset {} is outside 0..=5; using 0", self.preset));
             self.preset = 0;
         }
         if !valid_theme_name(&self.theme) {
@@ -360,6 +374,7 @@ mod tests {
         let mut config = Config::default();
         assert_eq!(config.update_ms, 1_000);
         assert!(!config.read_only);
+        assert!(config.show_gpu);
         assert!(config.validate().is_empty());
     }
 

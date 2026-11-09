@@ -53,7 +53,7 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
         draw_header_line(canvas, app, Rect::new(inner.x, inner.y, inner.w, 1));
     }
 
-    let show_cores = inner.w >= 48 && main.h >= 2 && !cpu.cores.is_empty();
+    let show_cores = inner.w >= 36 && main.h >= 2 && !cpu.cores.is_empty();
     let graph_w = if show_cores {
         (inner.w * 54 / 100).max(20)
     } else {
@@ -62,10 +62,21 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     let graph_area = Rect::new(main.x, main.y, graph_w, main.h);
     draw_main_graph(canvas, app, graph_area, compact);
     if show_cores {
+        let divider_x = main.x + graph_w;
+        if divider_x < main.right() {
+            canvas.vline(
+                main,
+                divider_x,
+                main.y,
+                main.h,
+                '│',
+                Style::fg(theme.border).dim(),
+            );
+        }
         let cores_area = Rect::new(
-            main.x + graph_w + 1,
+            divider_x + 2,
             main.y,
-            inner.w.saturating_sub(graph_w + 1),
+            inner.right().saturating_sub(divider_x + 2),
             main.h,
         );
         draw_cores(canvas, app, cores_area, compact);
@@ -153,20 +164,22 @@ fn draw_main_graph(canvas: &mut Canvas, app: &App, area: Rect, compact: bool) {
     }
     // Overlay current and average at the top-left, but only when there is
     // enough room to avoid hiding the graph.
-    if graph.w >= 24 && graph.h >= 3 {
-        let text = if compact {
-            format!(
-                "{}  avg {}",
-                format::percent(app.cpu_history.last() as f32),
-                format::percent(app.cpu_history.average() as f32)
-            )
-        } else {
+    if graph.w >= 16 && graph.h >= 2 {
+        let text = if !compact && graph.w >= 24 {
             format!(
                 "{}  avg {}  peak {}",
                 format::percent(app.cpu_history.last() as f32),
                 format::percent(app.cpu_history.average() as f32),
                 format::percent(app.cpu_history.max() as f32)
             )
+        } else if graph.w >= 24 {
+            format!(
+                "{}  avg {}",
+                format::percent(app.cpu_history.last() as f32),
+                format::percent(app.cpu_history.average() as f32)
+            )
+        } else {
+            format::percent(app.cpu_history.last() as f32)
         };
         canvas.text_truncated(
             graph,
@@ -204,8 +217,22 @@ fn draw_cores(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     if rect.is_empty() || cores.is_empty() {
         return;
     }
-    let columns = if rect.w >= 44 { 2 } else { 1 };
-    let rows = usize::from(rect.h);
+    let rows_available = usize::from(rect.h);
+    let columns = if rect.w >= 36
+        || (!compact && rect.w >= 25)
+        || (cores.len() > rows_available && rect.w >= 25)
+    {
+        2
+    } else {
+        1
+    };
+    let per_column = cores.len().div_ceil(columns).max(1);
+    let core_height = if compact {
+        1
+    } else {
+        u16::try_from((rows_available / per_column).clamp(1, 8)).unwrap_or(1)
+    };
+    let rows = usize::from(rect.h / core_height.max(1));
     let capacity = rows * columns;
     let show_more = cores.len() > capacity;
     let draw_capacity = if show_more {
@@ -213,27 +240,31 @@ fn draw_cores(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     } else {
         capacity
     };
-    let column_width = rect.w / columns as u16;
+    let column_width = rect.w / u16::try_from(columns).unwrap_or(1);
     for (drawn, usage) in cores.iter().enumerate().take(draw_capacity) {
         let column = drawn % columns;
         let row = drawn / columns;
         let cell = Rect::new(
-            rect.x + column as u16 * column_width,
-            rect.y + row as u16,
+            rect.x + u16::try_from(column).unwrap_or(0) * column_width,
+            rect.y + u16::try_from(row).unwrap_or(0) * core_height,
             column_width.saturating_sub(1),
-            1,
+            core_height,
         );
-        draw_core_line(canvas, app, cell, drawn, *usage, compact);
+        if core_height > 1 {
+            draw_core_block(canvas, app, cell, drawn, *usage);
+        } else {
+            draw_core_line(canvas, app, cell, drawn, *usage, compact);
+        }
     }
     if show_more {
         let drawn = draw_capacity;
         let column = drawn % columns;
         let row = drawn / columns;
         let cell = Rect::new(
-            rect.x + column as u16 * column_width,
-            rect.y + row as u16,
+            rect.x + u16::try_from(column).unwrap_or(0) * column_width,
+            rect.y + u16::try_from(row).unwrap_or(0) * core_height,
             column_width.saturating_sub(1),
-            1,
+            core_height,
         );
         let remaining = cores.len() - draw_capacity;
         canvas.text(
@@ -242,6 +273,55 @@ fn draw_cores(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
             cell.y,
             &format!("+{remaining} cores"),
             Style::fg(theme.dim).dim(),
+        );
+    }
+}
+
+fn draw_core_block(canvas: &mut Canvas, app: &App, rect: Rect, index: usize, usage: f32) {
+    if rect.is_empty() || rect.w < 10 || rect.h < 2 {
+        return;
+    }
+    let theme = &app.theme;
+    let label = format!("C{index}");
+    let label_width = 4u16.min(rect.w.saturating_sub(6));
+    canvas.text(rect, rect.x, rect.y, &label, Style::fg(theme.dim));
+    let percent_text = format!("{:>3}%", usage.round().clamp(0.0, 100.0) as u16);
+    let percent_width = 4u16;
+    let bar_width = rect
+        .w
+        .saturating_sub(label_width + percent_width + 1)
+        .max(1);
+    if bar_width >= 2 {
+        crate::ui::widgets::bar(
+            canvas,
+            Rect::new(rect.x + label_width, rect.y, bar_width, 1),
+            usage / 100.0,
+            theme.cpu,
+            theme,
+            app.graph_symbol() == GraphSymbol::Tty,
+        );
+    }
+    canvas.text_aligned(
+        Rect::new(
+            rect.right().saturating_sub(percent_width),
+            rect.y,
+            percent_width,
+            1,
+        ),
+        rect.y,
+        &percent_text,
+        Style::fg(theme.cpu.at((usage / 100.0).clamp(0.0, 1.0))).bold(),
+        Align::Right,
+    );
+    if let Some(history) = app.core_history.get(index) {
+        crate::ui::graph::draw(
+            canvas,
+            Rect::new(rect.x, rect.y + 1, rect.w, rect.h - 1),
+            history,
+            100.0,
+            theme.cpu,
+            app.graph_symbol(),
+            super::dim(theme),
         );
     }
 }
@@ -258,12 +338,8 @@ fn draw_core_line(
         return;
     }
     let theme = &app.theme;
-    let label = if index < 10 {
-        format!("C{index} ")
-    } else {
-        format!("C{index}")
-    };
-    let label_width = u16::try_from(format::width(&label)).unwrap_or(3);
+    let label = format!("C{index}");
+    let label_width = 4u16.min(rect.w.saturating_sub(6));
     canvas.text(rect, rect.x, rect.y, &label, Style::fg(theme.dim));
     let percent_text = format!("{:>3}%", usage.round().clamp(0.0, 100.0) as u16);
     let percent_width = 4u16;
@@ -301,7 +377,7 @@ fn draw_core_line(
         ),
         rect.y,
         &percent_text,
-        Style::fg(theme.foreground),
+        Style::fg(theme.cpu.at((usage / 100.0).clamp(0.0, 1.0))).bold(),
         Align::Right,
     );
 }

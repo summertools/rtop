@@ -1,6 +1,6 @@
 [package]
 name = "rtop"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.85"
 description = "A fast, elegant terminal system monitor written in Rust"
@@ -28,6 +28,9 @@ signal-hook = "0.3.18"
 sysinfo = "0.35.2"
 toml = "0.8.23"
 unicode-width = "0.2.2"
+
+[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+nvml-wrapper = "0.13.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Power", "Win32_System_SystemInformation"] }

@@ -11,13 +11,13 @@ use crate::config::{Config, GraphSymbol};
     name = "rtop",
     version,
     about = "A fast, elegant terminal system monitor",
-    long_about = "rtop shows CPU, memory, disks, network activity, and processes in a \
+    long_about = "rtop shows CPU, memory, disks, network activity, GPUs, and processes in a \
                   responsive terminal interface. It is a native Rust implementation inspired \
                   by btop, with a focus on safe parsing, a calm visual design, and predictable \
                   behaviour on Linux, macOS, and Windows."
 )]
 pub struct Cli {
-    /// Start with a preset: 0 overview, 1 CPU, 2 memory, 3 network, 4 processes
+    /// Start with a preset: 0 overview, 1 CPU, 2 memory, 3 network, 4 processes, 5 GPUs
     #[arg(short = 'p', long, value_name = "PRESET")]
     pub preset: Option<u8>,
 
@@ -83,10 +83,10 @@ impl Cli {
     pub fn apply(&self, config: &mut Config) -> Vec<String> {
         let mut warnings = Vec::new();
         if let Some(preset) = self.preset {
-            if preset <= 4 {
+            if preset <= 5 {
                 config.preset = preset;
             } else {
-                warnings.push(format!("preset {preset} is outside 0..=4; ignoring it"));
+                warnings.push(format!("preset {preset} is outside 0..=5; ignoring it"));
             }
         }
         if let Some(update) = self.update {

@@ -14,6 +14,7 @@ use sysinfo::{
     ProcessStatus, ProcessesToUpdate, RefreshKind, System, Uid, UpdateKind, Users,
 };
 
+mod gpu;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(windows)]
@@ -29,6 +30,7 @@ pub struct Snapshot {
     pub networks: Vec<NetworkSnapshot>,
     pub processes: Vec<ProcessInfo>,
     pub process_summary: ProcessSummary,
+    pub gpus: Vec<GpuSnapshot>,
     pub sensors: Vec<SensorReading>,
     pub battery: Option<BatteryInfo>,
     pub warnings: Vec<String>,
@@ -106,6 +108,72 @@ pub struct NetworkSnapshot {
     pub up: Option<bool>,
     pub addresses: Vec<String>,
     pub mac: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GpuVendor {
+    #[default]
+    Unknown,
+    Nvidia,
+    Amd,
+    Intel,
+    Apple,
+    Other,
+}
+
+impl GpuVendor {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Unknown | Self::Other => "gpu",
+            Self::Nvidia => "nvidia",
+            Self::Amd => "amd",
+            Self::Intel => "intel",
+            Self::Apple => "apple",
+        }
+    }
+}
+
+/// One GPU discovered through sysfs, NVML, or both.
+#[derive(Clone, Debug, Default)]
+pub struct GpuSnapshot {
+    pub index: u32,
+    pub name: String,
+    pub vendor: GpuVendor,
+    pub driver: String,
+    /// Normalised PCI bus identifier, used to merge sysfs and NVML views.
+    pub pci: Option<String>,
+    pub utilization: Option<f32>,
+    pub memory_used: Option<u64>,
+    pub memory_total: Option<u64>,
+    pub temperature: Option<f32>,
+    pub power_w: Option<f32>,
+    pub core_clock_mhz: Option<u32>,
+    pub memory_clock_mhz: Option<u32>,
+    pub fan_percent: Option<f32>,
+}
+
+impl GpuSnapshot {
+    #[must_use]
+    pub fn memory_ratio(&self) -> Option<f32> {
+        let used = self.memory_used?;
+        let total = self.memory_total.filter(|total| *total > 0)?;
+        Some((used as f32 / total as f32).clamp(0.0, 1.0))
+    }
+
+    #[must_use]
+    pub fn utilization_ratio(&self) -> f32 {
+        self.utilization.unwrap_or(0.0).clamp(0.0, 100.0) / 100.0
+    }
+
+    /// Stable key for history bookkeeping across snapshots. PCI addresses are
+    /// preferred; the fallback includes the device name and index.
+    #[must_use]
+    pub fn history_key(&self) -> String {
+        self.pci
+            .clone()
+            .unwrap_or_else(|| format!("{}:{}", self.name, self.index))
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -269,6 +337,7 @@ pub struct Collector {
     last_sample: Instant,
     tick: u64,
     cached_sensors: Vec<SensorReading>,
+    gpu: gpu::GpuCollector,
     cpu_model: String,
     warnings: Vec<String>,
     #[cfg(target_os = "linux")]
@@ -296,6 +365,7 @@ impl Collector {
             last_sample: Instant::now(),
             tick: 0,
             cached_sensors: Vec::new(),
+            gpu: gpu::GpuCollector::new(),
             cpu_model: String::new(),
             warnings: Vec::new(),
             #[cfg(target_os = "linux")]
@@ -378,6 +448,7 @@ impl Collector {
         let disks = self.build_disks(elapsed);
         let networks = self.build_networks(elapsed);
         let (processes, process_summary) = self.build_processes();
+        let gpus = self.gpu.sample();
         let battery = sample_battery();
         let host = self.build_host(&cpu);
 
@@ -403,6 +474,7 @@ impl Collector {
             networks,
             processes,
             process_summary,
+            gpus,
             sensors: self.cached_sensors.clone(),
             battery,
             warnings,
@@ -646,10 +718,22 @@ impl Collector {
         }
         let mut summary = ProcessSummary::default();
         let mut processes = Vec::with_capacity(cap);
+        let mut seen = HashSet::with_capacity(cap);
         for (pid, process) in self.system.processes().iter().take(cap) {
             // Windows exposes the System Idle Process as PID 0. It is not a
             // real process and cannot be signalled, so keep it out of the UI.
             if pid.as_u32() == 0 {
+                continue;
+            }
+            // sysinfo can expose Linux tasks (threads) both under
+            // /proc/<pid> and /proc/<pid>/task. They share the thread group's
+            // command line, which made one program look like many duplicate
+            // processes. Only real processes belong in the process table.
+            let (threads, is_thread) = process_thread_info(pid.as_u32());
+            if process.thread_kind().is_some() || is_thread {
+                continue;
+            }
+            if !seen.insert(pid.as_u32()) {
                 continue;
             }
             let state = ProcessState::from(process.status());
@@ -660,7 +744,6 @@ impl Collector {
                 ProcessState::Zombie => summary.zombie += 1,
                 _ => {}
             }
-            let threads = process_thread_count(pid.as_u32());
             if let Some(threads) = threads {
                 summary.threads = summary.threads.saturating_add(threads as usize);
             }
@@ -756,15 +839,15 @@ fn pick_cpu_temperature(sensors: &[SensorReading]) -> Option<f32> {
     best.map(|(_, temp)| temp)
 }
 
-fn process_thread_count(pid: u32) -> Option<u32> {
+fn process_thread_info(pid: u32) -> (Option<u32>, bool) {
     #[cfg(target_os = "linux")]
     {
-        linux::thread_count(pid)
+        linux::thread_info(pid)
     }
     #[cfg(not(target_os = "linux"))]
     {
         let _ = pid;
-        None
+        (None, false)
     }
 }
 
@@ -807,6 +890,7 @@ pub fn unavailable_snapshot(message: impl Into<String>) -> Snapshot {
         networks: Vec::new(),
         processes: Vec::new(),
         process_summary: ProcessSummary::default(),
+        gpus: Vec::new(),
         sensors: Vec::new(),
         battery: None,
         warnings: vec![message.into()],
@@ -1056,6 +1140,11 @@ mod tests {
         assert!(snapshot.memory.total > 0);
         assert!(!snapshot.processes.is_empty());
         assert!(snapshot.processes.iter().all(|p| p.pid > 0));
+        let mut pids = HashSet::new();
+        assert!(
+            snapshot.processes.iter().all(|p| pids.insert(p.pid)),
+            "the process table contains a duplicate PID"
+        );
     }
 
     #[test]

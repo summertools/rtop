@@ -63,14 +63,14 @@ fn draw_help(canvas: &mut Canvas, app: &App, screen: Rect, scroll: u16) {
     if inner.is_empty() {
         return;
     }
-    let sections: [(&str, &[(&str, &str)]); 6] = [
+    let sections: [(&str, &[(&str, &str)]); 7] = [
         (
             "navigation",
             &[
                 ("↑ / ↓  j", "move selection"),
                 ("PgUp / PgDn", "move one page"),
                 ("Home / End  g/G", "first / last process"),
-                ("Tab / 0-4", "switch view"),
+                ("Tab / 0-5", "switch view"),
             ],
         ),
         (
@@ -89,6 +89,7 @@ fn draw_help(canvas: &mut Canvas, app: &App, screen: Rect, scroll: u16) {
                 ("f", "filter"),
                 ("c / m / p / n / u", "sort by cpu / mem / pid / name / user"),
                 ("r", "reverse sort order"),
+                ("← / →", "previous / next sort field"),
                 ("t", "tree mode"),
                 ("e / w / Space", "expand / collapse children"),
                 ("k", "send a signal"),
@@ -99,6 +100,14 @@ fn draw_help(canvas: &mut Canvas, app: &App, screen: Rect, scroll: u16) {
             &[
                 ("[ / ]", "previous / next interface"),
                 ("a", "automatic interface selection"),
+            ],
+        ),
+        (
+            "gpu",
+            &[
+                ("5", "GPU view"),
+                ("NVIDIA", "NVML: usage, VRAM, temperature, power"),
+                ("AMD / Intel", "sysfs: usage, VRAM, clocks, sensors (Linux)"),
             ],
         ),
         (

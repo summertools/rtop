@@ -8,8 +8,9 @@ use rtop::app::{App, Overlay, Preset, ToastLevel};
 use rtop::config::{Config, GraphSymbol};
 use rtop::format;
 use rtop::platform::{
-    BatteryInfo, BatteryState, CpuBreakdown, CpuSnapshot, DiskSnapshot, HostInfo, MemorySnapshot,
-    NetworkSnapshot, ProcessInfo, ProcessState, ProcessSummary, SensorReading, Snapshot,
+    BatteryInfo, BatteryState, CpuBreakdown, CpuSnapshot, DiskSnapshot, GpuSnapshot, GpuVendor,
+    HostInfo, MemorySnapshot, NetworkSnapshot, ProcessInfo, ProcessState, ProcessSummary,
+    SensorReading, Snapshot,
 };
 use rtop::theme::Theme;
 use rtop::ui;
@@ -155,6 +156,38 @@ fn snapshot() -> Snapshot {
             zombie: 2,
             threads: 180,
         },
+        gpus: vec![
+            GpuSnapshot {
+                index: 0,
+                name: "NVIDIA GeForce RTX 4070\u{1b}[31m".to_owned(),
+                vendor: GpuVendor::Nvidia,
+                driver: "nvidia".to_owned(),
+                pci: Some("01:00.0".to_owned()),
+                utilization: Some(42.0),
+                memory_used: Some(6 * 1024 * 1024 * 1024),
+                memory_total: Some(12 * 1024 * 1024 * 1024),
+                temperature: Some(58.0),
+                power_w: Some(112.0),
+                core_clock_mhz: Some(2_475),
+                memory_clock_mhz: Some(10_500),
+                fan_percent: Some(38.0),
+            },
+            GpuSnapshot {
+                index: 1,
+                name: "AMD Radeon 780M".to_owned(),
+                vendor: GpuVendor::Amd,
+                driver: "amdgpu".to_owned(),
+                pci: Some("0a:00.0".to_owned()),
+                utilization: Some(7.0),
+                memory_used: Some(512 * 1024 * 1024),
+                memory_total: Some(2 * 1024 * 1024 * 1024),
+                temperature: Some(45.0),
+                power_w: Some(9.0),
+                core_clock_mhz: Some(1_100),
+                memory_clock_mhz: None,
+                fan_percent: None,
+            },
+        ],
         sensors: vec![SensorReading {
             label: "Package id 0".to_owned(),
             temperature: 61.2,
@@ -217,6 +250,60 @@ fn all_presets_render_without_overflow() {
             }
         }
     }
+}
+
+#[test]
+fn gpu_view_renders_devices_and_absent_hint() {
+    let config = Config {
+        preset: 5,
+        ..Config::default()
+    };
+    let app = app(config);
+    let (canvas, _) = ui::render(&app, 160, 46);
+    let plain = canvas.plain();
+    assert!(plain.contains("gpu0"), "missing GPU card: {plain}");
+    assert!(plain.contains("NVIDIA GeForce RTX 4070"));
+    assert!(plain.contains("vram"));
+    assert!(plain.contains("history"));
+
+    let mut one = app.clone();
+    one.preset = Preset::Gpu;
+    if let Some(snapshot) = one.snapshot.as_mut() {
+        snapshot.gpus.truncate(1);
+    }
+    for (width, height) in [(40, 12), (80, 24), (120, 36), (200, 60)] {
+        let (canvas, _) = ui::render(&one, width, height);
+        for line in canvas.plain().lines() {
+            assert!(format::width(line) <= usize::from(width));
+        }
+    }
+
+    let mut empty = app.clone();
+    if let Some(snapshot) = empty.snapshot.as_mut() {
+        snapshot.gpus.clear();
+    }
+    let (canvas, _) = ui::render(&empty, 120, 36);
+    assert!(canvas.plain().contains("no supported GPU"));
+}
+
+#[test]
+fn gpu_summary_appears_in_the_header_when_devices_exist() {
+    let app = app(Config::default());
+    let (canvas, _) = ui::render(&app, 160, 46);
+    assert!(canvas.plain().contains("GPU 42% ×2"));
+}
+
+#[test]
+fn hiding_gpu_removes_the_tab_and_summary() {
+    let config = Config {
+        show_gpu: false,
+        ..Config::default()
+    };
+    let app = app(config);
+    let (canvas, _) = ui::render(&app, 160, 46);
+    let plain = canvas.plain();
+    assert!(!plain.contains("5 gpu"));
+    assert!(!plain.contains("GPU 42%"));
 }
 
 #[test]

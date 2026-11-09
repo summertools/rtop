@@ -1,6 +1,6 @@
 # rtop
 
-**A fast, elegant terminal system monitor in Rust — CPU, memory, disks, network, and processes on Linux, macOS, and Windows.**
+**A fast, elegant terminal system monitor in Rust — CPU, memory, disks, network, GPU, and processes on Linux, macOS, and Windows.**
 
 English | [简体中文](README.zh-CN.md)
 
@@ -29,7 +29,7 @@ single binary with no runtime services and no shell commands.
 ## Features
 
 - Responsive overview plus dedicated **CPU**, **memory + disks**, **network**,
-  and **process** views.
+  **process**, and **GPU** views.
 - Braille, block, and plain-ASCII graphs with three-stop gradients and
   per-core history.
 - CPU package and per-core usage, model, frequency, load average, uptime,
@@ -39,7 +39,11 @@ single binary with no runtime services and no shell commands.
 - Network download/upload histories, automatic busiest-interface selection,
   link speed, addresses, and totals.
 - Process table with CPU/memory/PID/name/user sorting, reverse order, filtering,
-  tree view, details, and signal delivery.
+  tree view, details, and signal delivery. `←`/`→` cycles sort fields quickly,
+  and Linux tasks (threads) are never duplicated as separate processes.
+- Best-effort GPU monitoring: utilisation, VRAM, temperature, power, clocks,
+  fans, and history. NVIDIA uses NVML on Linux and Windows; AMD/Intel use the
+  Linux DRM/hwmon sysfs interfaces.
 - Seven built-in themes and btop-compatible user `.theme` files.
 - Full mouse support: clickable tabs, process rows, interface rows, and wheel
   scrolling.
@@ -69,17 +73,36 @@ single binary with no runtime services and no shell commands.
 │⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀     0 │
 │↑ upload 1.2 MiB/s (9.6 Mbit/s)                                                                  total 8.4 GiB      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ proc 186/186  cpu↓──────────────────────────────────────────────────────────────────────────────────────────────────╮
+╭─ proc 186/186  cpu ↓  12 run─────────────────────────────────────────────────────────────────────────────────────────╮
 │ R    812 firefox            /usr/lib/firefox/firefox                                     you          1.4G ██▍  12.4 │
 │ S   1021 terminal           /usr/bin/alacritty                                           you          184M █▏    5.8 │
 │ S   1044 code               /usr/share/code/code --type=renderer                        you          912M █▏    4.1 │
 │ S      1 systemd            /usr/lib/systemd/systemd --switched-root --system            root         14M ░     0.0 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ↑↓ move  Enter info  f filter  c/m/p/n sort  t tree  k kill  ? help  q quit
+ ↑↓ move  ←→ sort  Enter info  f filter  r reverse  t tree  k kill  ? help  q quit
 ```
 
 The exact layout adapts to the terminal size. Narrow terminals switch to a
-compact view automatically; press `1`–`4` to see one view at a time.
+compact view automatically; press `1`–`5` to see one view at a time.
+
+When a supported GPU is present, `5` opens a dedicated GPU view and the
+overview adds a compact GPU column on wide terminals:
+
+```text
+  rtop  │  0 all   1 cpu   2 mem   3 net   4 proc   5 gpu                           ? keys 16:22:11
+╭─ gpu0 68%  nvidia──────────────────────────────╮╭─ gpu1 12%  amd─────────────────────────────────╮
+│NVIDIA GeForce RTX 4090                   nvidia││AMD Radeon 780M                     amd · amdgpu│
+│util     ██████████████████████▌░░░░░░░░░░   68%││util     ███▉░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   12%│
+│vram      ███████████████▊░░░░░    18G/24G   75%││vram      ██████████▌░░░░░░░░░░  2.0G/4.0G   50%│
+│72°C · 315 W · core 2745 MHz · mem 10501 MHz    ││48°C · 22 W · core 1800 MHz                     │
+│history                                 peak 68%││history                                 peak 12%│
+│                                                ││                                                │
+│                                               ⢸││                                                │
+│                                               ⢸││                                                │
+│⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⢸││⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⢸│
+╰────────────────────────────────────────────────╯╰────────────────────────────────────────────────╯
+ Tab next  +/- speed  s pause  ? help  q quit
+```
 
 ## Platform support
 
@@ -94,7 +117,8 @@ compact view automatically; press `1`–`4` to see one view at a time.
 | Process signals | Unix signals | Unix signals | TerminateProcess |
 | CPU temperatures | sysinfo sensors | sysinfo sensors | sysinfo sensors* |
 | Battery indicator | sysfs | Not yet | `GetSystemPowerStatus` |
-| GPU monitoring | Not yet | Not yet | Not yet |
+| NVIDIA GPU | NVML (usage/VRAM/temp/power/clocks) | Not yet | NVML |
+| AMD / Intel GPU | sysfs (usage/VRAM/temp/power/clocks) | Not yet | Not yet |
 
 \* Temperature availability depends on the firmware/drivers exposing sensors to
 the operating system. Missing sensors simply hide the indicator.
@@ -142,7 +166,7 @@ rtop [OPTIONS]
 
 | Option | Description |
 | --- | --- |
-| `-p, --preset <0-4>` | Start at the overview, CPU, memory, network, or process view |
+| `-p, --preset <0-5>` | Start at the overview, CPU, memory, network, process, or GPU view |
 | `-u, --update <MS>` | Refresh interval, `250`–`10000` ms (default `1000`) |
 | `--theme <NAME>` | Built-in theme or a theme file in the user theme directory |
 | `--graph-symbol <STYLE>` | `braille`, `block`, or `tty` |
@@ -185,12 +209,13 @@ rtop --dump --width 100 --height 30 --preset 1
 | `Home`, `End`, `g`, `G` | First / last process |
 | `Enter`, `i` | Process details |
 | `f` | Filter processes (type, `Enter` applies, `Esc` cancels, `Ctrl+U` clears) |
+| `←`, `→` | Previous / next process sort field |
 | `c`, `m`, `p`, `n`, `u` | Sort by CPU, memory, PID, name, or user |
 | `r` | Reverse the sort order |
 | `t` | Toggle tree view |
-| `e`, `→` / `w`, `←` / `Space` | Expand / collapse a process subtree |
+| `e` / `w` / `Space` | Expand / collapse a process subtree |
 | `k` | Send a signal (confirmation dialog) |
-| `0`–`4`, `Tab`, `Shift+Tab` | Switch views |
+| `0`–`5`, `Tab`, `Shift+Tab` | Switch views |
 | `[`, `]` | Previous / next network interface |
 | `a` | Toggle automatic interface selection |
 | `+`, `-` | Faster / slower refresh |
@@ -221,7 +246,7 @@ Example:
 # Refresh interval in milliseconds (250-10000)
 update_ms = 1000
 
-# 0 overview, 1 CPU, 2 memory/disks, 3 network, 4 processes
+# 0 overview, 1 CPU, 2 memory/disks, 3 network, 4 processes, 5 GPUs
 preset = 0
 
 # braille, block, or tty
@@ -235,6 +260,7 @@ tty_mode = false
 rounded_corners = true
 theme_background = false
 show_battery = true
+show_gpu = true         # GPU view and summary when a device is detected
 
 proc_sort = "cpu"       # cpu, memory, pid, name, user
 proc_tree = false
@@ -288,7 +314,8 @@ treats that data as untrusted:
   before drawing. ESC, C0/C1 controls, bidirectional overrides, and zero-width
   direction marks cannot alter the layout.
 - **No shell:** the program never runs shell commands. Process signals are sent
-  through the operating system API.
+  through the operating system API. GPU data comes from bounded sysfs reads and
+  the locally installed NVML library; rtop never executes `nvidia-smi`.
 - **PID reuse:** before sending a signal, the process start time and name are
   re-read and compared with the snapshot that the confirmation dialog showed.
   PID 1 (Unix), low system PIDs (Windows), and the monitor itself are refused.
@@ -299,9 +326,10 @@ treats that data as untrusted:
 - **Terminal restoration:** raw mode, the alternate screen, mouse capture, and
   bracketed paste are restored by RAII, a panic hook, and `SIGTERM`/`SIGHUP`/
   `SIGQUIT` handlers.
-- **Minimal unsafe:** only three small platform calls use `unsafe`
-  (`localtime_r` on Unix, `GetLocalTime` and `GetSystemPowerStatus` on Windows).
-  No unsafe string handling or pointer arithmetic exists in the project.
+- **Minimal unsafe:** rtop itself uses `unsafe` only for three small platform
+  calls (`localtime_r` on Unix, `GetLocalTime` and `GetSystemPowerStatus` on
+  Windows). GPU vendor data uses the safe `nvml-wrapper` library, which loads the
+  driver dynamically and contains its own audited FFI.
 - **No network access** and no background services. All data is read from the
   operating system and discarded when the process exits.
 
@@ -322,9 +350,9 @@ want a strictly observational monitor.
   interval and sends owned `Snapshot` values through a bounded channel. The UI
   thread never blocks on `/proc`, WMI, or IOKit.
 - Platform data is normalised into plain Rust structs (`CpuSnapshot`,
-  `MemorySnapshot`, `DiskSnapshot`, `NetworkSnapshot`, `ProcessInfo`). Linux
-  adds CPU time breakdowns, cached memory, interface speed/wireless state, and
-  battery information from sysfs.
+  `MemorySnapshot`, `DiskSnapshot`, `NetworkSnapshot`, `GpuSnapshot`,
+  `ProcessInfo`). Linux adds CPU time breakdowns, cached memory, interface
+  speed/wireless state, GPU sysfs data, and battery information.
 - The UI draws into a clipped cell canvas. Wide characters are handled
   explicitly, boxes and graphs are bounds-checked, and the previous frame is
   diffed so only changed cells reach the terminal.
@@ -370,7 +398,10 @@ views at 40×12 through 200×60, overlays, and end-to-end CLI behaviour.
 
 ## Limitations
 
-- GPU monitoring is not implemented yet.
+- GPU monitoring is read-only and best effort. NVIDIA requires a working NVML
+  driver; AMD/Intel support depends on the kernel exposing DRM/hwmon files.
+  Apple GPUs, AMD/Intel GPUs on Windows, overclocking, and fan control are not
+  implemented.
 - Battery status is available on Linux (sysfs) and Windows
   (`GetSystemPowerStatus`), but not yet on macOS.
 - The portable process backend does not expose a thread count on macOS or

@@ -9,7 +9,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
 
 use crate::config::{Config, GraphSymbol, ProcSort};
 use crate::format;
-use crate::platform::{self, NetworkSnapshot, ProcessInfo, Snapshot};
+use crate::platform::{self, GpuSnapshot, NetworkSnapshot, ProcessInfo, Snapshot};
 use crate::theme::Theme;
 use crate::ui::canvas::Rect;
 use crate::ui::graph::GraphData;
@@ -23,6 +23,7 @@ pub enum Preset {
     Memory,
     Network,
     Processes,
+    Gpu,
 }
 
 impl Preset {
@@ -33,6 +34,7 @@ impl Preset {
             2 => Self::Memory,
             3 => Self::Network,
             4 => Self::Processes,
+            5 => Self::Gpu,
             _ => Self::Overview,
         }
     }
@@ -45,6 +47,7 @@ impl Preset {
             Self::Memory => 2,
             Self::Network => 3,
             Self::Processes => 4,
+            Self::Gpu => 5,
         }
     }
 
@@ -56,6 +59,7 @@ impl Preset {
             Self::Memory => "mem",
             Self::Network => "net",
             Self::Processes => "proc",
+            Self::Gpu => "gpu",
         }
     }
 
@@ -66,29 +70,32 @@ impl Preset {
             Self::Cpu => Self::Memory,
             Self::Memory => Self::Network,
             Self::Network => Self::Processes,
-            Self::Processes => Self::Overview,
+            Self::Processes => Self::Gpu,
+            Self::Gpu => Self::Overview,
         }
     }
 
     #[must_use]
     pub const fn previous(self) -> Self {
         match self {
-            Self::Overview => Self::Processes,
+            Self::Overview => Self::Gpu,
             Self::Cpu => Self::Overview,
             Self::Memory => Self::Cpu,
             Self::Network => Self::Memory,
             Self::Processes => Self::Network,
+            Self::Gpu => Self::Processes,
         }
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 5] {
+    pub const fn all() -> [Self; 6] {
         [
             Self::Overview,
             Self::Cpu,
             Self::Memory,
             Self::Network,
             Self::Processes,
+            Self::Gpu,
         ]
     }
 }
@@ -187,6 +194,7 @@ pub struct App {
     pub warnings: Vec<String>,
     pub cpu_history: GraphData,
     pub core_history: Vec<GraphData>,
+    pub gpu_history: HashMap<String, GraphData>,
     pub memory_history: GraphData,
     pub net_history: HashMap<String, NetHistory>,
     pub selected_pid: Option<u32>,
@@ -224,8 +232,12 @@ impl App {
     ) -> Self {
         let interval = config.update_ms.clamp(250, 10_000);
         update_handle.store(interval, Ordering::Relaxed);
+        let mut preset = Preset::from_u8(config.preset);
+        if preset == Preset::Gpu && !config.show_gpu {
+            preset = Preset::Overview;
+        }
         let mut app = Self {
-            preset: Preset::from_u8(config.preset),
+            preset,
             sort: config.proc_sort,
             reverse: config.proc_reversed,
             tree: config.proc_tree,
@@ -243,6 +255,7 @@ impl App {
             warnings,
             cpu_history: GraphData::new(512),
             core_history: Vec::new(),
+            gpu_history: HashMap::new(),
             memory_history: GraphData::new(512),
             net_history: HashMap::new(),
             selected_pid: None,
@@ -338,6 +351,15 @@ impl App {
         }
         for (history, usage) in self.core_history.iter_mut().zip(&snapshot.cpu.cores) {
             history.push(f64::from(*usage));
+        }
+        let gpu_keys: HashSet<String> =
+            snapshot.gpus.iter().map(GpuSnapshot::history_key).collect();
+        self.gpu_history.retain(|key, _| gpu_keys.contains(key));
+        for gpu in &snapshot.gpus {
+            self.gpu_history
+                .entry(gpu.history_key())
+                .or_insert_with(|| GraphData::new(256))
+                .push(f64::from(gpu.utilization.unwrap_or(0.0)));
         }
         if snapshot.memory.total > 0 {
             self.memory_history
@@ -438,6 +460,14 @@ impl App {
             .find(|process| process.pid == pid)
     }
 
+    /// Whether the latest snapshot contains at least one supported GPU.
+    #[must_use]
+    pub fn has_gpu(&self) -> bool {
+        self.snapshot
+            .as_ref()
+            .is_some_and(|snapshot| !snapshot.gpus.is_empty())
+    }
+
     #[must_use]
     pub fn selected_network(&self) -> Option<&NetworkSnapshot> {
         let snapshot = self.snapshot.as_ref()?;
@@ -527,16 +557,27 @@ impl App {
     }
 
     pub fn set_preset(&mut self, preset: Preset) {
+        if preset == Preset::Gpu && !self.config.show_gpu {
+            return;
+        }
         self.preset = preset;
         self.dirty = true;
     }
 
     pub fn cycle_preset(&mut self, forward: bool) {
-        self.preset = if forward {
+        let mut next = if forward {
             self.preset.next()
         } else {
             self.preset.previous()
         };
+        if next == Preset::Gpu && !self.config.show_gpu {
+            next = if forward {
+                next.next()
+            } else {
+                next.previous()
+            };
+        }
+        self.preset = next;
         self.dirty = true;
     }
 
@@ -547,6 +588,24 @@ impl App {
             self.sort = sort;
             self.reverse = false;
         }
+        self.rebuild_rows();
+        self.dirty = true;
+    }
+
+    /// Cycle the process sort field, like btop's left/right arrow keys.
+    /// Picking a different field resets the direction to that field's natural
+    /// default; pressing the same field's shortcut still toggles it.
+    pub fn cycle_sort(&mut self, forward: bool) {
+        let next = if forward {
+            self.sort.cycle()
+        } else {
+            self.sort.previous()
+        };
+        if next == self.sort {
+            return;
+        }
+        self.sort = next;
+        self.reverse = false;
         self.rebuild_rows();
         self.dirty = true;
     }
@@ -882,6 +941,7 @@ impl App {
             KeyCode::Char('2') => self.set_preset(Preset::Memory),
             KeyCode::Char('3') => self.set_preset(Preset::Network),
             KeyCode::Char('4') => self.set_preset(Preset::Processes),
+            KeyCode::Char('5') if self.config.show_gpu => self.set_preset(Preset::Gpu),
             KeyCode::Up => self.move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
             KeyCode::PageUp => self.page_selection(-1),
@@ -897,8 +957,10 @@ impl App {
             KeyCode::Char('u') => self.set_sort(ProcSort::User),
             KeyCode::Char('r') => self.toggle_reverse(),
             KeyCode::Char('t') => self.toggle_tree(),
-            KeyCode::Char('e') | KeyCode::Right => self.expand_selected(),
-            KeyCode::Char('w') | KeyCode::Left => self.collapse_selected(),
+            KeyCode::Left => self.cycle_sort(false),
+            KeyCode::Right => self.cycle_sort(true),
+            KeyCode::Char('e') => self.expand_selected(),
+            KeyCode::Char('w') => self.collapse_selected(),
             KeyCode::Char(' ') => self.toggle_collapsed(),
             KeyCode::Char('k') => self.open_signal_dialog(),
             KeyCode::Char('[') => self.next_network(-1),
@@ -1106,9 +1168,14 @@ pub(crate) fn build_rows(
         );
         tokens.iter().all(|token| haystack.contains(token))
     };
+    // The process table is keyed by PID. Keep a single row even if a platform
+    // backend ever returns the same PID twice (for example a task exposed both
+    // in /proc and /proc/<pid>/task).
+    let mut unique = HashSet::with_capacity(processes.len());
     let mut indices: Vec<usize> = processes
         .iter()
         .enumerate()
+        .filter(|(_, process)| unique.insert(process.pid))
         .filter(|(_, process)| matches(process))
         .map(|(index, _)| index)
         .collect();
@@ -1307,6 +1374,56 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_pids_are_collapsed_to_one_row() {
+        let processes = vec![
+            process(7, None, "worker", 10.0, 10),
+            process(7, None, "worker-task", 10.0, 10),
+            process(8, None, "other", 1.0, 10),
+        ];
+        let rows = build_rows(&processes, ProcSort::Pid, false, false, "", &HashSet::new());
+        assert_eq!(
+            rows.iter().map(|row| row.pid).collect::<Vec<_>>(),
+            vec![7, 8]
+        );
+    }
+
+    #[test]
+    fn disabled_gpu_view_is_skipped_by_tab_cycling() {
+        let theme = crate::theme::Theme::builtin("default").unwrap();
+        let config = Config {
+            show_gpu: false,
+            ..Config::default()
+        };
+        let mut app = App::new(config, theme, Vec::new(), Arc::new(AtomicU64::new(1000)));
+        for _ in 0..12 {
+            app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+            assert_ne!(app.preset, Preset::Gpu);
+        }
+        for _ in 0..12 {
+            app.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE));
+            assert_ne!(app.preset, Preset::Gpu);
+        }
+    }
+
+    #[test]
+    fn left_and_right_cycle_the_process_sort() {
+        let theme = crate::theme::Theme::builtin("default").unwrap();
+        let mut app = App::new(
+            Config::default(),
+            theme,
+            Vec::new(),
+            Arc::new(AtomicU64::new(1000)),
+        );
+        assert_eq!(app.sort, ProcSort::Cpu);
+        app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+        assert_eq!(app.sort, ProcSort::Memory);
+        app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+        assert_eq!(app.sort, ProcSort::Cpu);
+        app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+        assert_eq!(app.sort, ProcSort::User);
+    }
+
+    #[test]
     fn reverse_flips_the_order() {
         let processes = vec![
             process(1, None, "one", 1.0, 10),
@@ -1383,7 +1500,7 @@ mod tests {
     #[test]
     fn presets_cycle_in_both_directions() {
         assert_eq!(Preset::Overview.next(), Preset::Cpu);
-        assert_eq!(Preset::Overview.previous(), Preset::Processes);
+        assert_eq!(Preset::Overview.previous(), Preset::Gpu);
         for preset in Preset::all() {
             assert_eq!(preset.next().previous(), preset);
             assert_eq!(Preset::from_u8(preset.index()), preset);

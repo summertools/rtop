@@ -4,6 +4,38 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-11-09
+
+### Added
+
+- Best-effort GPU monitoring with a dedicated GPU view and overview summary:
+  utilisation, VRAM, temperature, power, core/memory clocks, fan speed, and
+  utilisation history.
+- NVIDIA GPUs are queried through NVML on Linux and Windows when the driver
+  library is available; AMD and Intel GPUs are discovered through Linux DRM and
+  hwmon sysfs files. GPU probing is read-only, bounded, and never invokes a
+  shell command.
+- `show_gpu` configuration option, `5` preset/`--preset 5`, and GPU history.
+
+### Changed
+
+- Process sorting now cycles fields with `←`/`→`, matching btop. Tree expansion
+  remains on `e`/`w`/`Space`; the footer and help screen document the new keys.
+- Refined the visual hierarchy: a lifted navigation band, accented active tabs,
+  a subtler footer band, a memory composition strip, two-column core grids on
+  wider layouts, colour-coded per-core/process CPU values, and a richer process
+  header with running-count and filter status.
+
+### Fixed
+
+- Linux thread-group tasks exposed by sysinfo are no longer listed as separate
+  processes, so one program can no longer appear as a pile of duplicate rows.
+  The process list also de-duplicates by PID defensively.
+- Process table selection, arrows, and sort indicators stay correct after
+  filtering and duplicate removal.
+
+[0.1.2]: https://github.com/summertools/rtop/releases/tag/v0.1.2
+
 ## [0.1.1] - 2026-11-07
 
 ### Fixed

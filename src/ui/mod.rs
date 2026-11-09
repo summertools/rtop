@@ -5,6 +5,7 @@ pub mod graph;
 pub mod widgets;
 
 mod cpu;
+mod gpu;
 mod mem;
 mod net;
 mod overlays;
@@ -82,6 +83,7 @@ pub fn render(app: &App, width: u16, height: u16) -> (Canvas, Layout) {
             Preset::Memory => mem::draw(&mut canvas, app, content, false),
             Preset::Network => net::draw(&mut canvas, app, content, false, &mut layout),
             Preset::Processes => proc::draw(&mut canvas, app, content, &mut layout),
+            Preset::Gpu => gpu::draw(&mut canvas, app, content, false),
             Preset::Overview => {}
         }
     }
@@ -108,12 +110,28 @@ fn draw_overview(canvas: &mut Canvas, app: &App, content: Rect, layout: &mut Lay
     } else {
         (Rect::new(0, 0, 0, 0), rest)
     };
-    let halves = top.columns(2);
-    if let Some(left) = halves.first() {
-        cpu::draw(canvas, app, *left, true);
-    }
-    if let Some(right) = halves.get(1) {
-        mem::draw(canvas, app, *right, true);
+    if app.config.show_gpu && app.has_gpu() && content.w >= 132 {
+        let cpu_w = top.w * 38 / 100;
+        let mem_w = top.w * 34 / 100;
+        let cpu_area = Rect::new(top.x, top.y, cpu_w, top.h);
+        let mem_area = Rect::new(top.x + cpu_w, top.y, mem_w, top.h);
+        let gpu_area = Rect::new(
+            top.x + cpu_w + mem_w,
+            top.y,
+            top.w.saturating_sub(cpu_w + mem_w),
+            top.h,
+        );
+        cpu::draw(canvas, app, cpu_area, true);
+        mem::draw(canvas, app, mem_area, true);
+        gpu::draw(canvas, app, gpu_area, true);
+    } else {
+        let halves = top.columns(2);
+        if let Some(left) = halves.first() {
+            cpu::draw(canvas, app, *left, true);
+        }
+        if let Some(right) = halves.get(1) {
+            mem::draw(canvas, app, *right, true);
+        }
     }
     if !net_area.is_empty() {
         net::draw(canvas, app, net_area, true, layout);
@@ -123,6 +141,10 @@ fn draw_overview(canvas: &mut Canvas, app: &App, content: Rect, layout: &mut Lay
 
 fn draw_header(canvas: &mut Canvas, app: &App, rect: Rect) -> Vec<(Preset, Rect)> {
     let theme = &app.theme;
+    // A calm, slightly lifted band separates navigation from the data panels.
+    // Text drawn afterwards with the default background inherits this surface.
+    let band = Style::plain().with_bg(theme.background.lerp(theme.highlight_bg, 0.28));
+    canvas.fill(rect, band);
     let mut tabs = Vec::new();
     let mut x = rect.x.saturating_add(1);
     let badge = widgets::chip(
@@ -136,6 +158,10 @@ fn draw_header(canvas: &mut Canvas, app: &App, rect: Rect) -> Vec<(Preset, Rect)
         true,
     );
     x = x.saturating_add(badge).saturating_add(1);
+    if rect.w >= 96 {
+        x = x.saturating_add(canvas.text(rect, x, rect.y, "│", Style::fg(theme.border)));
+        x = x.saturating_add(1);
+    }
 
     let compact = rect.w < 92;
     let battery_reserve = if app.config.show_battery
@@ -150,10 +176,18 @@ fn draw_header(canvas: &mut Canvas, app: &App, rect: Rect) -> Vec<(Preset, Rect)
         0
     };
     let pause_reserve = if app.paused { 9 } else { 0 };
-    let reserve_right = (11 + battery_reserve + pause_reserve).min(rect.w / 2);
+    let help_reserve = if rect.w >= 96 { 17 } else { 11 };
+    let reserve_right = (help_reserve + battery_reserve + pause_reserve).min(rect.w / 2);
     let limit = rect.right().saturating_sub(reserve_right);
-    let mut items: Vec<(Preset, String, u16)> = Vec::with_capacity(5);
-    for preset in Preset::all() {
+    let presets: Vec<Preset> = Preset::all()
+        .into_iter()
+        .filter(|preset| {
+            *preset != Preset::Gpu
+                || (app.config.show_gpu && (app.has_gpu() || app.preset == Preset::Gpu))
+        })
+        .collect();
+    let mut items: Vec<(Preset, String, u16)> = Vec::with_capacity(presets.len());
+    for preset in presets {
         let text = if compact {
             preset.label().to_owned()
         } else {
@@ -259,11 +293,13 @@ fn draw_header(canvas: &mut Canvas, app: &App, rect: Rect) -> Vec<(Preset, Rect)
         right = right.saturating_sub(width + 1);
     }
     if right > x + 2 {
+        let help = if rect.w >= 96 { "? keys" } else { "?" };
+        let help_width = u16::try_from(format::width(help)).unwrap_or(1);
         canvas.text(
             rect,
-            right.saturating_sub(1),
+            right.saturating_sub(help_width),
             rect.y,
-            "?",
+            help,
             Style::fg(theme.dim),
         );
     }
@@ -327,6 +363,17 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
 
     // Right-aligned operational facts.
     let mut facts: Vec<(String, Style)> = Vec::new();
+    if app.config.show_gpu && !snapshot.gpus.is_empty() {
+        let gpu = &snapshot.gpus[0];
+        let mut text = gpu
+            .utilization
+            .map_or_else(|| "GPU --".to_owned(), |value| format!("GPU {value:.0}%"));
+        if snapshot.gpus.len() > 1 {
+            text.push_str(" ×");
+            text.push_str(&snapshot.gpus.len().to_string());
+        }
+        facts.push((text, Style::fg(theme.accent)));
+    }
     facts.push((
         format!("up {}", format::uptime(snapshot.cpu.uptime_secs)),
         Style::fg(theme.foreground),
@@ -358,7 +405,7 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
         .map(|(text, _)| u16::try_from(format::width(text)).unwrap_or(0))
         .sum::<u16>()
         .saturating_add(3 * (facts.len().saturating_sub(1)) as u16);
-    while fact_width + 12 > rect.w / 2 && facts.len() > 1 {
+    while fact_width + 8 > rect.w / 2 && facts.len() > 1 {
         fact_width = fact_width.saturating_sub(
             u16::try_from(format::width(&facts.pop().map(|f| f.0).unwrap_or_default()))
                 .unwrap_or(0)
@@ -395,6 +442,10 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
 
 fn draw_footer(canvas: &mut Canvas, app: &App, rect: Rect) {
     let theme = &app.theme;
+    canvas.fill(
+        rect,
+        Style::plain().with_bg(theme.background.lerp(theme.highlight_bg, 0.18)),
+    );
     let hints: Vec<(&str, &str)> = if app.filter_edit.is_some() {
         vec![
             ("type", "filter"),
@@ -413,13 +464,15 @@ fn draw_footer(canvas: &mut Canvas, app: &App, rect: Rect) {
             Overlay::None => match app.preset {
                 Preset::Overview => vec![
                     ("↑↓", "move"),
+                    ("←→", "sort"),
                     ("Enter", "info"),
                     ("f", "filter"),
+                    ("t", "tree"),
                     ("k", "kill"),
                     ("?", "help"),
                     ("q", "quit"),
                 ],
-                Preset::Cpu | Preset::Memory => vec![
+                Preset::Cpu | Preset::Memory | Preset::Gpu => vec![
                     ("Tab", "next"),
                     ("+/-", "speed"),
                     ("s", "pause"),
@@ -435,9 +488,10 @@ fn draw_footer(canvas: &mut Canvas, app: &App, rect: Rect) {
                 ],
                 Preset::Processes => vec![
                     ("↑↓", "move"),
+                    ("←→", "sort"),
                     ("Enter", "info"),
                     ("f", "filter"),
-                    ("c/m/p/n", "sort"),
+                    ("r", "reverse"),
                     ("t", "tree"),
                     ("k", "kill"),
                     ("?", "help"),

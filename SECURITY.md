@@ -28,9 +28,15 @@ particular interest:
 - process signal safety: PID reuse, permission bypass, or signalling the wrong
   process;
 - terminal state left behind after panics or signals;
-- unsafe code. The project uses `unsafe` only for three small platform calls
+- unsafe code. rtop itself uses `unsafe` only for three small platform calls
   (`localtime_r` on Unix, `GetLocalTime` and `GetSystemPowerStatus` on Windows)
-  plus the `signal-hook` dependency.
+  plus the `signal-hook` dependency. GPU vendor data is read through the safe
+  `nvml-wrapper` crate, whose dynamic-library FFI is encapsulated by that crate.
+- GPU probing: Linux sysfs reads are bounded and restricted to fixed
+  `/sys/class/drm` and `/sys/class/hwmon` paths; NVML is loaded dynamically and
+  never through a shell command. On Windows it is loaded from the protected
+  `System32` directory rather than the current working directory. GPU
+  monitoring is read-only and offers no fan or clock control.
 
 Out of scope: the accuracy of data reported by the operating system, denial of
 service caused by a user choosing an extremely small refresh interval, and

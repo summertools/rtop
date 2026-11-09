@@ -270,19 +270,27 @@ fn read_number(path: &Path) -> Option<u64> {
         .ok()
 }
 
-/// Number of threads in a process, from `/proc/<pid>/status`.
-pub fn thread_count(pid: u32) -> Option<u32> {
+/// Read the thread count and whether this `/proc` entry is a task (thread)
+/// rather than a process. `Tgid` equals the PID for a real process; a thread
+/// has the thread-group leader's PID as its `Tgid`.
+pub fn thread_info(pid: u32) -> (Option<u32>, bool) {
     if pid == 0 {
-        return None;
+        return (None, false);
     }
     let path = format!("/proc/{pid}/status");
-    let text = read_capped(Path::new(&path), 64 * 1024)?;
+    let Some(text) = read_capped(Path::new(&path), 64 * 1024) else {
+        return (None, false);
+    };
+    let mut threads = None;
+    let mut is_thread = false;
     for line in text.lines() {
         if let Some(value) = line.strip_prefix("Threads:") {
-            return value.trim().parse::<u32>().ok().filter(|count| *count > 0);
+            threads = value.trim().parse::<u32>().ok().filter(|count| *count > 0);
+        } else if let Some(value) = line.strip_prefix("Tgid:") {
+            is_thread = value.trim().parse::<u32>().is_ok_and(|tgid| tgid != pid);
         }
     }
-    None
+    (threads, is_thread)
 }
 
 /// Reject path components that could escape a sysfs directory.
@@ -297,7 +305,7 @@ fn safe_component(name: &str) -> bool {
         && !name.chars().any(char::is_control)
 }
 
-fn read_capped(path: &Path, cap: u64) -> Option<String> {
+pub(crate) fn read_capped(path: &Path, cap: u64) -> Option<String> {
     let file = File::open(path).ok()?;
     let mut bytes = Vec::with_capacity(256);
     file.take(cap).read_to_end(&mut bytes).ok()?;
@@ -355,9 +363,26 @@ mod tests {
     }
 
     #[test]
-    fn thread_count_reads_the_current_process() {
-        let count = thread_count(std::process::id()).expect("own thread count");
-        assert!(count >= 1);
-        assert!(thread_count(0).is_none());
+    fn thread_info_reads_the_current_process() {
+        let (count, is_thread) = thread_info(std::process::id());
+        assert!(count.expect("own thread count") >= 1);
+        assert!(!is_thread);
+        assert_eq!(thread_info(0), (None, false));
+        // The test harness normally has more than one thread. If so, verify
+        // that a task directory is recognised by its differing Tgid.
+        let pid = std::process::id();
+        if let Ok(entries) = std::fs::read_dir(format!("/proc/{pid}/task")) {
+            for entry in entries.flatten().take(16) {
+                let Ok(tid) = entry.file_name().to_string_lossy().parse::<u32>() else {
+                    continue;
+                };
+                if tid != pid {
+                    let (tcount, is_thread) = thread_info(tid);
+                    assert!(tcount.unwrap_or(0) >= 1);
+                    assert!(is_thread, "task {tid} was not recognised as a thread");
+                    return;
+                }
+            }
+        }
     }
 }

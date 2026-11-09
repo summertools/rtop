@@ -95,17 +95,21 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, layout: &mut Layout) {
     let visible = app.proc_rows.len();
     let total = snapshot.process_summary.total;
     let mut suffix = format!(
-        "{visible}/{total}  {} {}{}",
+        "{visible}/{total}  {} {}{}  {} run",
         app.sort.label(),
         crate::app::sort_arrow(app.sort, app.reverse),
         if app.tree && app.filter.trim().is_empty() {
             "  tree"
         } else {
             ""
-        }
+        },
+        snapshot.process_summary.running
     );
     if !app.filter.is_empty() {
-        suffix.push_str("  filter");
+        let filter = format::sanitize(&app.filter);
+        let filter = format::truncate(&filter, 24);
+        suffix.push_str("  filter: ");
+        suffix.push_str(&filter);
     }
     let inner = super::panel(
         canvas,
@@ -123,6 +127,10 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, layout: &mut Layout) {
     let table_w = inner.w.saturating_sub(u16::from(needs_scrollbar));
     let columns = Columns::new(table_w);
     let header = Rect::new(inner.x, inner.y, table_w, 1);
+    canvas.fill(
+        header,
+        Style::plain().with_bg(theme.background.lerp(theme.highlight_bg, 0.22)),
+    );
     draw_header_row(canvas, app, header, &columns);
     let body = Rect::new(inner.x, inner.y + 1, inner.w, inner.h.saturating_sub(1));
     layout.proc_body = body;
@@ -430,8 +438,9 @@ fn draw_row(canvas: &mut Canvas, app: &App, rect: Rect, row: &ProcRow, columns: 
         Style::fg(if selected {
             theme.highlight_fg
         } else {
-            theme.foreground
-        }),
+            theme.cpu.at((process.cpu / 100.0).clamp(0.0, 1.0))
+        })
+        .bold(),
         Align::Right,
     );
 }

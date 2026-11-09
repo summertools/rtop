@@ -62,6 +62,19 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
 
     let metrics = build_metrics(app, memory);
     let show_disks = !snapshot.disks.is_empty();
+    // A compact composition strip gives the memory panel the same immediate
+    // "shape" as btop while the rows below retain exact byte values.
+    let composition = if left.h >= 8 && left.w >= 28 {
+        let strip = Rect::new(left.x, left.y, left.w, 1);
+        let body = Rect::new(left.x, left.y + 1, left.w, left.h - 1);
+        (Some(strip), body)
+    } else {
+        (None, left)
+    };
+    let left = composition.1;
+    if let Some(strip) = composition.0 {
+        draw_composition(canvas, app, strip, memory);
+    }
     if compact {
         let disk_h = if show_disks {
             (1 + snapshot.disks.len().min(2) as u16).min(left.h.saturating_sub(4))
@@ -169,7 +182,7 @@ fn build_metrics(app: &App, memory: &crate::platform::MemorySnapshot) -> Vec<Met
         metrics.push(Metric {
             label: "Swap",
             value: format!(
-                "{} / {}",
+                "{}/{}",
                 format::bytes_short(memory.swap_used),
                 format::bytes_short(memory.swap_total)
             ),
@@ -178,6 +191,51 @@ fn build_metrics(app: &App, memory: &crate::platform::MemorySnapshot) -> Vec<Met
         });
     }
     metrics
+}
+
+fn draw_composition(
+    canvas: &mut Canvas,
+    app: &App,
+    rect: Rect,
+    memory: &crate::platform::MemorySnapshot,
+) {
+    if rect.is_empty() || memory.total == 0 || rect.w < 12 {
+        return;
+    }
+    let theme = &app.theme;
+    let label = "ram";
+    canvas.text(rect, rect.x, rect.y, label, Style::fg(theme.dim).dim());
+    let bar = Rect::new(
+        rect.x.saturating_add(4),
+        rect.y,
+        rect.w.saturating_sub(4),
+        1,
+    );
+    if bar.is_empty() {
+        return;
+    }
+    let total = memory.total;
+    let used = memory.used.min(total);
+    let cached = memory.cached.unwrap_or(0).min(total.saturating_sub(used));
+    let to_cells = |value: u64| -> u16 {
+        let cells = (value as f64 / total as f64 * f64::from(bar.w)).round();
+        u16::try_from(cells as u64).unwrap_or(bar.w).min(bar.w)
+    };
+    let used_cells = to_cells(used);
+    let cached_cells = to_cells(cached).min(bar.w.saturating_sub(used_cells));
+    for index in 0..bar.w {
+        let (ch, style) = if index < used_cells {
+            (
+                '█',
+                Style::fg(theme.memory.at(f32::from(index) / f32::from(bar.w.max(1)))),
+            )
+        } else if index < used_cells + cached_cells {
+            ('▓', Style::fg(theme.disk.at(0.55)))
+        } else {
+            ('░', Style::fg(theme.border))
+        };
+        canvas.put(bar.x + index, bar.y, ch, style);
+    }
 }
 
 fn draw_metrics(canvas: &mut Canvas, app: &App, rect: Rect, metrics: &[Metric]) {

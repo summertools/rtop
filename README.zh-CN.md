@@ -1,6 +1,6 @@
 # rtop
 
-**用 Rust 编写的快速、优雅的终端系统监视器：在 Linux、macOS 和 Windows 上查看 CPU、内存、磁盘、网络与进程。**
+**用 Rust 编写的快速、优雅的终端系统监视器：在 Linux、macOS 和 Windows 上查看 CPU、内存、磁盘、网络、GPU 与进程。**
 
 [English](README.md) | 简体中文
 
@@ -27,12 +27,15 @@
 
 ## 功能
 
-- 自适应总览，以及独立的 **CPU**、**内存 + 磁盘**、**网络**、**进程** 视图。
+- 自适应总览，以及独立的 **CPU**、**内存 + 磁盘**、**网络**、**进程**、**GPU** 视图。
 - Braille、方块和纯 ASCII 三种图形符号，三色渐变与历史曲线。
 - CPU 总体/每核心占用、型号、频率、负载、运行时间、温度和电池状态。
 - 内存、交换分区、缓存（Linux）、空闲/可用内存、挂载点占用和磁盘 I/O 速率。
 - 网络下载/上传历史、自动选择最忙网卡、链路速率、IP/MAC 与累计流量。
-- 进程表支持 CPU/内存/PID/名称/用户排序、反向排序、过滤、树形视图、详情与信号发送。
+- 进程表支持 CPU/内存/PID/名称/用户排序、反向排序、过滤、树形视图、详情与信号发送；
+  `←`/`→` 快速切换排序字段，Linux 线程任务不会再被重复显示为多个进程。
+- 尽力提供 GPU 监控：占用率、显存、温度、功耗、频率、风扇与历史曲线。Linux/Windows
+  的 NVIDIA 设备通过 NVML 读取，Linux 的 AMD/Intel 设备通过 DRM/hwmon sysfs 读取。
 - 7 个内置主题，并兼容 btop 的 `.theme` 用户主题文件。
 - 完整鼠标支持：点击标签页、进程行、网卡行以及滚轮滚动。
 - `--dump` 可在没有 TTY 的环境渲染一帧，适合 CI、脚本和截图。
@@ -58,16 +61,16 @@
 │⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀     0 │
 │↑ upload 1.2 MiB/s (9.6 Mbit/s)                                                                  total 8.4 GiB      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ proc 186/186  cpu↓──────────────────────────────────────────────────────────────────────────────────────────────────╮
+╭─ proc 186/186  cpu ↓  12 run─────────────────────────────────────────────────────────────────────────────────────────╮
 │ R    812 firefox            /usr/lib/firefox/firefox                                     you          1.4G ██▍  12.4 │
 │ S   1021 terminal           /usr/bin/alacritty                                           you          184M █▏    5.8 │
 │ S   1044 code               /usr/share/code/code --type=renderer                        you          912M █▏    4.1 │
 │ S      1 systemd            /usr/lib/systemd/systemd --switched-root --system            root         14M ░     0.0 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
- ↑↓ 选择  Enter 详情  f 过滤  c/m/p/n 排序  t 树形  k 信号  ? 帮助  q 退出
+ ↑↓ 选择  ←→ 排序  Enter 详情  f 过滤  r 反向  t 树形  k 信号  ? 帮助  q 退出
 ```
 
-布局会随终端尺寸自动调整。窄终端会自动切换为紧凑视图；按 `1`–`4` 可单独查看某个面板。
+布局会随终端尺寸自动调整。窄终端会自动切换为紧凑视图；按 `1`–`5` 可单独查看某个面板。
 
 ## 平台支持
 
@@ -82,7 +85,8 @@
 | 发送进程信号 | Unix 信号 | Unix 信号 | TerminateProcess |
 | CPU 温度 | sysinfo 传感器 | sysinfo 传感器 | sysinfo 传感器* |
 | 电池指示 | sysfs | 暂未实现 | `GetSystemPowerStatus` |
-| GPU 监控 | 暂未实现 | 暂未实现 | 暂未实现 |
+| NVIDIA GPU | NVML（占用/显存/温度/功耗/频率） | 暂未实现 | NVML |
+| AMD / Intel GPU | sysfs（占用/显存/温度/功耗/频率） | 暂未实现 | 暂未实现 |
 
 \* 温度取决于固件/驱动是否向系统暴露传感器；没有传感器时只隐藏温度指示，不影响其他功能。
 
@@ -127,7 +131,7 @@ rtop [OPTIONS]
 
 | 选项 | 说明 |
 | --- | --- |
-| `-p, --preset <0-4>` | 启动时显示总览、CPU、内存、网络或进程视图 |
+| `-p, --preset <0-5>` | 启动时显示总览、CPU、内存、网络、进程或 GPU 视图 |
 | `-u, --update <MS>` | 刷新间隔，`250`–`10000` 毫秒，默认 `1000` |
 | `--theme <NAME>` | 内置主题名或用户主题文件 |
 | `--graph-symbol <STYLE>` | `braille`、`block` 或 `tty` |
@@ -169,12 +173,13 @@ rtop --dump --width 100 --height 30 --preset 1
 | `Home`、`End`、`g`、`G` | 第一项 / 最后一项 |
 | `Enter`、`i` | 进程详情 |
 | `f` | 过滤进程（输入后 `Enter` 应用，`Esc` 取消，`Ctrl+U` 清空） |
+| `←`、`→` | 上一个 / 下一个进程排序字段 |
 | `c`、`m`、`p`、`n`、`u` | 按 CPU、内存、PID、名称、用户排序 |
 | `r` | 反转排序 |
 | `t` | 切换树形视图 |
-| `e`、`→` / `w`、`←` / `Space` | 展开 / 折叠子树 |
+| `e` / `w` / `Space` | 展开 / 折叠子树 |
 | `k` | 发送信号（带确认对话框） |
-| `0`–`4`、`Tab`、`Shift+Tab` | 切换视图 |
+| `0`–`5`、`Tab`、`Shift+Tab` | 切换视图 |
 | `[`、`]` | 上一个 / 下一个网卡 |
 | `a` | 切换自动选择网卡 |
 | `+`、`-` | 加快 / 减慢刷新 |
@@ -203,7 +208,7 @@ rtop --dump --width 100 --height 30 --preset 1
 # 刷新间隔（毫秒，250-10000）
 update_ms = 1000
 
-# 0 总览，1 CPU，2 内存/磁盘，3 网络，4 进程
+# 0 总览，1 CPU，2 内存/磁盘，3 网络，4 进程，5 GPU
 preset = 0
 
 # braille、block 或 tty
@@ -217,6 +222,7 @@ tty_mode = false
 rounded_corners = true
 theme_background = false
 show_battery = true
+show_gpu = true         # 检测到设备时显示 GPU 视图与摘要
 
 proc_sort = "cpu"       # cpu、memory、pid、name、user
 proc_tree = false
@@ -264,7 +270,8 @@ theme[cpu_end]="#bb9af7"
 - **终端注入防护**：进程名、命令行、用户名、挂载点、网卡名和地址在绘制前都会经过
   ANSI/控制字符/双向控制字符转义。ESC、C0/C1 控制符、双向覆盖字符和零宽方向标记
   无法改变界面布局。
-- **不执行 shell**：程序不会调用 shell；信号通过操作系统 API 发送。
+- **不执行 shell**：程序不会调用 shell；信号通过操作系统 API 发送。GPU 数据来自
+  有界 sysfs 读取和本地安装的 NVML 库，不会执行 `nvidia-smi`。
 - **PID 复用防护**：发送信号前会重新读取进程启动时间和名称，与确认框展示的快照比对。
   Unix 上拒绝 PID 1，Windows 上拒绝低编号系统进程，并拒绝向自身发送信号。
   `--read-only` 会完全禁用信号对话框。
@@ -272,9 +279,9 @@ theme[cpu_end]="#bb9af7"
   限制大小，构造路径前校验网卡名。
 - **终端恢复**：原始模式、备用屏幕、鼠标捕获和 bracketed paste 会通过 RAII、panic
   hook 以及 `SIGTERM`/`SIGHUP`/`SIGQUIT` 处理器恢复。
-- **最少 unsafe**：项目中只有三个小型平台调用使用 `unsafe`（Unix 的 `localtime_r`，
-  Windows 的 `GetLocalTime` 与 `GetSystemPowerStatus`），没有不安全的字符串处理或
-  指针运算。
+- **最少 unsafe**：rtop 自身只有三个小型平台调用使用 `unsafe`（Unix 的 `localtime_r`，
+  Windows 的 `GetLocalTime` 与 `GetSystemPowerStatus`）。GPU 数据通过安全的
+  `nvml-wrapper` 动态加载驱动，其 FFI 由该库自行封装。
 - **无网络访问**、无后台服务。所有数据只从操作系统读取，进程退出后即丢弃。
 
 发送信号是明确的、需要确认的操作，并受操作系统权限限制。在共享或不可信机器上，
@@ -292,8 +299,8 @@ theme[cpu_end]="#bb9af7"
 - 后台采集线程按配置间隔采样，并通过有界通道发送拥有所有权的 `Snapshot`。
   UI 线程不会因为 `/proc`、WMI 或 IOKit 阻塞。
 - 平台数据被规范化为普通 Rust 结构体（`CpuSnapshot`、`MemorySnapshot`、
-  `DiskSnapshot`、`NetworkSnapshot`、`ProcessInfo`）。Linux 额外提供 CPU 时间拆分、
-  缓存内存、网卡速率/无线状态和 sysfs 电池信息。
+  `DiskSnapshot`、`NetworkSnapshot`、`GpuSnapshot`、`ProcessInfo`）。Linux 额外提供
+  CPU 时间拆分、缓存内存、网卡速率/无线状态、GPU sysfs 数据和电池信息。
 - UI 绘制到带裁切的单元格画布中。宽字符显式处理，边框和图形都做越界检查，
   并与上一帧比较，只向终端发送变化的单元格。
 - 历史数据保存在 App 而不是采集器中，因此暂停更新会冻结视图，而不是丢数据。
@@ -336,7 +343,8 @@ cargo check --target x86_64-pc-windows-gnu
 
 ## 已知限制
 
-- 暂未实现 GPU 监控。
+- GPU 监控为只读且尽力而为：NVIDIA 需要可用的 NVML 驱动，AMD/Intel 依赖内核暴露
+  DRM/hwmon 文件；暂不支持 Apple GPU、Windows 上的 AMD/Intel GPU、超频与风扇控制。
 - 电池状态支持 Linux（sysfs）和 Windows（`GetSystemPowerStatus`），macOS 暂未实现。
 - 便携式进程后端在 macOS 和 Windows 上不提供线程数；详情面板显示 `-`。
 - 温度传感器取决于操作系统暴露的硬件信息。容器和虚拟机通常没有传感器。

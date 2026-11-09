@@ -33,7 +33,7 @@ fn dump_renders_a_plain_frame() {
 
 #[test]
 fn presets_and_themes_are_accepted() {
-    for preset in ["0", "1", "2", "3", "4"] {
+    for preset in ["0", "1", "2", "3", "4", "5"] {
         let output = binary()
             .args([
                 "--dump",
