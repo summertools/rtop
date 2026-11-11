@@ -92,49 +92,64 @@ fn draw_header_line(canvas: &mut Canvas, app: &App, rect: Rect) {
     let theme = &app.theme;
     let snapshot = app.snapshot.as_ref().expect("snapshot checked");
     let cpu = &snapshot.cpu;
-    let mut x = rect.x;
-    let model_width = rect.w.saturating_sub(34).max(10);
-    x = x.saturating_add(canvas.text_truncated(
-        rect,
-        x,
-        rect.y,
-        &snapshot.host.cpu_model,
-        Style::fg(theme.foreground),
-        model_width,
-    ));
-    let mut right = rect.right();
+
+    // Facts are ordered by importance. Keep a readable slice of the model on
+    // the left and drop lower-priority facts instead of letting them collide.
+    let mut facts: Vec<(String, Style)> = Vec::new();
     if cpu.average_frequency_mhz > 0 {
-        let text = format!("{:.2} GHz", cpu.average_frequency_mhz as f64 / 1000.0);
-        let width = u16::try_from(format::width(&text)).unwrap_or(0);
-        right = right.saturating_sub(width);
-        canvas.text(rect, right, rect.y, &text, super::dim(theme));
-        right = right.saturating_sub(2);
+        facts.push((
+            format!("{:.2} GHz", cpu.average_frequency_mhz as f64 / 1000.0),
+            super::dim(theme),
+        ));
     }
     if let Some(temp) = cpu.temperature {
-        let text = format!("{temp:.0}°C");
-        let width = u16::try_from(format::width(&text)).unwrap_or(0);
-        right = right.saturating_sub(width);
-        canvas.text(
-            rect,
-            right,
-            rect.y,
-            &text,
+        facts.push((
+            format!("{temp:.0}°C"),
             Style::fg(crate::ui::graph::temperature_color(temp, theme.temp)).bold(),
-        );
-        right = right.saturating_sub(2);
+        ));
     }
-    if cpu.cores.len() > 1 && right > x + 4 {
-        let text = format!("{} cores", cpu.cores.len());
-        let width = u16::try_from(format::width(&text)).unwrap_or(0);
-        if right.saturating_sub(width) > x {
-            canvas.text(
-                rect,
-                right.saturating_sub(width),
-                rect.y,
-                &text,
-                super::dim(theme),
-            );
+    if cpu.cores.len() > 1 {
+        facts.push((format!("{} cores", cpu.cores.len()), super::dim(theme)));
+    }
+
+    let reserve = 12u16.min(rect.w / 2);
+    let budget = rect.w.saturating_sub(reserve);
+    let mut visible: Vec<(String, Style)> = Vec::new();
+    let mut fact_width = 0u16;
+    for (text, style) in facts {
+        let text_width = u16::try_from(format::width(&text)).unwrap_or(0);
+        let extra = if visible.is_empty() {
+            text_width
+        } else {
+            text_width.saturating_add(2)
+        };
+        if fact_width.saturating_add(extra) > budget {
+            break;
         }
+        fact_width = fact_width.saturating_add(extra);
+        visible.push((text, style));
+    }
+    let fact_start = rect.right().saturating_sub(fact_width);
+    let mut x = fact_start;
+    for (index, (text, style)) in visible.iter().enumerate() {
+        if index > 0 {
+            x = x.saturating_add(2);
+        }
+        x = x.saturating_add(canvas.text(rect, x, rect.y, text, *style));
+    }
+
+    let model_end = fact_start.saturating_sub(2);
+    if model_end > rect.x
+        && let Some(model) = super::hardware::cpu_model(&snapshot.host)
+    {
+        canvas.text_truncated(
+            rect,
+            rect.x,
+            rect.y,
+            &model,
+            Style::fg(theme.foreground),
+            model_end.saturating_sub(rect.x),
+        );
     }
 }
 

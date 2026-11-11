@@ -451,3 +451,144 @@ fn toast_levels_are_rendered() {
         assert!(canvas.plain().contains("something happened"));
     }
 }
+
+#[test]
+fn header_labels_cpu_and_gpu_models() {
+    let app = app(Config::default());
+    let (canvas, _) = ui::render(&app, 180, 50);
+    let plain = canvas.plain();
+    let info = plain.lines().nth(1).unwrap_or_default();
+    assert!(info.contains("testbox"), "identity missing: {info:?}");
+    assert!(
+        info.contains("cpu Example CPU @ 3.20GHz"),
+        "CPU model label missing: {info:?}"
+    );
+    assert!(
+        info.contains("gpu NVIDIA GeForce RTX 4070"),
+        "GPU model label missing: {info:?}"
+    );
+    assert!(info.contains("GPU 42% ×2"), "GPU summary missing: {info:?}");
+
+    // The model keeps a reserved slice even on an 80-column terminal, while
+    // the most important GPU summary remains visible.
+    let (canvas, _) = ui::render(&app, 80, 30);
+    let info = canvas.plain().lines().nth(1).unwrap_or_default().to_owned();
+    assert!(
+        info.contains("cpu Example CPU @ 3.20GHz"),
+        "CPU model was crowded out at 80 columns: {info:?}"
+    );
+    assert!(info.contains("GPU 42% ×2"), "GPU summary missing: {info:?}");
+}
+
+#[test]
+fn gpu_view_shows_model_and_pci_location() {
+    let mut app = app(Config {
+        preset: 5,
+        ..Config::default()
+    });
+    app.preset = Preset::Gpu;
+    if let Some(snapshot) = app.snapshot.as_mut() {
+        snapshot.gpus.truncate(1);
+    }
+    let (canvas, _) = ui::render(&app, 180, 50);
+    let plain = canvas.plain();
+    assert!(plain.contains("NVIDIA GeForce RTX 4070"), "{plain}");
+    assert!(
+        plain.contains("pci 01:00.0"),
+        "PCI location missing: {plain}"
+    );
+    let info = plain.lines().nth(1).unwrap_or_default();
+    assert!(
+        info.contains("gpu NVIDIA GeForce RTX 4070"),
+        "GPU model label missing from header: {info:?}"
+    );
+}
+
+#[test]
+fn gpu_list_mode_uses_safe_fallback_names() {
+    let mut app = app(Config::default());
+    app.preset = Preset::Gpu;
+    if let Some(snapshot) = app.snapshot.as_mut() {
+        let mut third = snapshot.gpus[0].clone();
+        third.index = 2;
+        third.name = "   ".to_owned();
+        third.pci = Some("0c:00.0".to_owned());
+        snapshot.gpus.push(third);
+    }
+    // A short viewport switches the multi-GPU view to its compact list.
+    let (canvas, _) = ui::render(&app, 120, 15);
+    let plain = canvas.plain();
+    assert!(plain.contains("nvidia GPU 0c:00.0"), "{plain}");
+    for line in plain.lines() {
+        assert!(format::width(line) <= 120);
+    }
+}
+
+#[test]
+fn cpu_view_names_model_and_keeps_primary_facts() {
+    let mut app = app(Config::default());
+    app.preset = Preset::Cpu;
+    let (canvas, _) = ui::render(&app, 120, 36);
+    let plain = canvas.plain();
+    assert!(plain.contains("Example CPU @ 3.20GHz"), "{plain}");
+    assert!(plain.contains("3.20 GHz"), "{plain}");
+    assert!(plain.contains("8 cores"), "{plain}");
+}
+
+#[test]
+fn missing_models_have_stable_fallbacks() {
+    let mut app = app(Config::default());
+    app.preset = Preset::Gpu;
+    if let Some(snapshot) = app.snapshot.as_mut() {
+        snapshot.host.cpu_model.clear();
+        snapshot.gpus.truncate(1);
+        snapshot.gpus[0].name = "   ".to_owned();
+        snapshot.gpus[0].pci = Some("01:00.0".to_owned());
+    }
+    let (canvas, _) = ui::render(&app, 160, 46);
+    let plain = canvas.plain();
+    assert!(plain.contains("nvidia GPU 01:00.0"), "{plain}");
+    let info = plain.lines().nth(1).unwrap_or_default();
+    assert!(
+        info.contains("gpu nvidia GPU 01:00.0"),
+        "GPU fallback label missing: {info:?}"
+    );
+    assert!(
+        !info.contains("cpu "),
+        "empty CPU model should not get a label: {info:?}"
+    );
+}
+
+#[test]
+fn untrusted_model_strings_are_sanitized_and_never_overflow() {
+    let mut app = app(Config::default());
+    let hostile = format!("\u{1b}]0;owned\u{7}\u{202e}{}", "X".repeat(400));
+    if let Some(snapshot) = app.snapshot.as_mut() {
+        snapshot.host.cpu_model = hostile.clone();
+        for gpu in &mut snapshot.gpus {
+            gpu.name = hostile.clone();
+            gpu.pci = Some(format!("\u{1b}[31m{}", "0".repeat(300)));
+        }
+    }
+    for preset in [Preset::Overview, Preset::Cpu, Preset::Gpu] {
+        app.preset = preset;
+        for (width, height) in [(40, 12), (60, 20), (80, 24), (120, 36), (200, 60)] {
+            let (canvas, _) = ui::render(&app, width, height);
+            for line in canvas.plain().lines() {
+                assert!(
+                    format::width(line) <= usize::from(width),
+                    "overflow at {width}x{height} preset {preset:?}: {line:?}"
+                );
+                assert!(!line.contains('\u{1b}'), "escape leaked: {line:?}");
+                assert!(!line.contains('\u{202e}'), "bidi leaked: {line:?}");
+            }
+        }
+    }
+
+    app.config.graph_symbol = GraphSymbol::Tty;
+    app.preset = Preset::Gpu;
+    let (canvas, _) = ui::render(&app, 120, 36);
+    for line in canvas.plain().lines() {
+        assert!(line.is_ascii(), "TTY output is not ASCII: {line:?}");
+    }
+}

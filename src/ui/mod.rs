@@ -6,6 +6,7 @@ pub mod widgets;
 
 mod cpu;
 mod gpu;
+mod hardware;
 mod mem;
 mod net;
 mod overlays;
@@ -315,7 +316,7 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
     let Some(snapshot) = app.snapshot.as_ref() else {
         canvas.text(
             rect,
-            rect.x + 1,
+            rect.x.saturating_add(1),
             rect.y,
             "collecting system information…",
             Style::fg(theme.dim),
@@ -323,20 +324,23 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
         return;
     };
     let host = &snapshot.host;
-    let mut x = rect.x + 1;
-    let host_style = Style::fg(theme.title).bold();
-    let host_width = u16::try_from(format::width(&host.hostname))
+
+    // Identity on the left. Sanitising before measuring keeps a hostile
+    // hostname or user name from skewing the layout budget.
+    let mut x = rect.x.saturating_add(1);
+    let host_text = format::sanitize(&host.hostname);
+    let host_width = u16::try_from(format::width(&host_text))
         .unwrap_or(0)
         .min(rect.w / 4);
     x = x.saturating_add(canvas.text_truncated(
         rect,
         x,
         rect.y,
-        &host.hostname,
-        host_style,
+        &host_text,
+        Style::fg(theme.title).bold(),
         host_width,
     ));
-    let user = host.user.clone();
+    let user = format::sanitize(&host.user);
     let left_limit = rect.w / 2;
     if rect.w > 70 && x.saturating_add(19) <= left_limit {
         x = x.saturating_add(widgets::separator(canvas, rect, x, rect.y, theme));
@@ -360,6 +364,32 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
             22,
         ));
     }
+
+    // Build the hardware labels first: the active view's model gets priority
+    // and a reserved slice of the header even when operational facts are long.
+    let mut models: Vec<(&str, String)> = Vec::with_capacity(2);
+    if let Some(model) = hardware::cpu_model(host) {
+        models.push(("cpu", model));
+    }
+    if app.config.show_gpu
+        && let Some(model) = hardware::gpu_summary(&snapshot.gpus)
+    {
+        models.push(("gpu", model));
+    }
+    if app.preset == Preset::Gpu {
+        models.reverse();
+    }
+    // Reserve enough room for the primary model, capped so a malformed
+    // 192-character name cannot push away every operational fact.
+    let model_reserve = models.first().map_or(0u16, |(label, model)| {
+        let width = format::width(label)
+            .saturating_add(1)
+            .saturating_add(format::width(model));
+        u16::try_from(width)
+            .unwrap_or(u16::MAX)
+            .saturating_add(2)
+            .clamp(10, 50)
+    });
 
     // Right-aligned operational facts.
     let mut facts: Vec<(String, Style)> = Vec::new();
@@ -400,20 +430,33 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
             Style::fg(theme.dim),
         ));
     }
-    let mut fact_width: u16 = facts
-        .iter()
-        .map(|(text, _)| u16::try_from(format::width(text)).unwrap_or(0))
-        .sum::<u16>()
-        .saturating_add(3 * (facts.len().saturating_sub(1)) as u16);
-    while fact_width + 8 > rect.w / 2 && facts.len() > 1 {
-        fact_width = fact_width.saturating_sub(
-            u16::try_from(format::width(&facts.pop().map(|f| f.0).unwrap_or_default()))
-                .unwrap_or(0)
-                .saturating_add(3),
-        );
+
+    // Keep two cells between the identity and the facts. Facts are added in
+    // priority order and the remainder is dropped, so the right side can
+    // never run into the left side on a narrow terminal.
+    let facts_end = rect.right().saturating_sub(1);
+    let min_fact_x = x.saturating_add(2);
+    let budget = facts_end
+        .saturating_sub(min_fact_x)
+        .saturating_sub(model_reserve);
+    let mut visible_facts: Vec<(String, Style)> = Vec::new();
+    let mut fact_width = 0u16;
+    for (text, style) in facts {
+        let text_width = u16::try_from(format::width(&text)).unwrap_or(0);
+        let extra = if visible_facts.is_empty() {
+            text_width
+        } else {
+            text_width.saturating_add(3)
+        };
+        if fact_width.saturating_add(extra) > budget {
+            break;
+        }
+        fact_width = fact_width.saturating_add(extra);
+        visible_facts.push((text, style));
     }
-    let mut fact_x = rect.right().saturating_sub(fact_width + 1);
-    for (index, (text, style)) in facts.iter().enumerate() {
+    let fact_start = facts_end.saturating_sub(fact_width);
+    let mut fact_x = fact_start;
+    for (index, (text, style)) in visible_facts.iter().enumerate() {
         if index > 0 {
             fact_x = fact_x.saturating_add(widgets::separator(canvas, rect, fact_x, rect.y, theme));
         }
@@ -422,18 +465,35 @@ fn draw_header_info(canvas: &mut Canvas, app: &App, rect: Rect) {
         fact_x = fact_x.saturating_add(width);
     }
 
-    // Use the space between the identity and the facts for the CPU model.
+    // Hardware models live between the identity and the facts. The active
+    // view gets priority: the GPU model wins in the GPU view, the CPU model
+    // elsewhere. Both are shown only when there is room for a readable pair.
     let model_x = x.saturating_add(2);
-    if model_x < rect.right().saturating_sub(fact_width + 2) {
-        let available = rect
-            .right()
-            .saturating_sub(fact_width + 2)
-            .saturating_sub(model_x);
+    let model_end = fact_start.saturating_sub(2);
+    let available = model_end.saturating_sub(model_x);
+    if available < 8 {
+        return;
+    }
+
+    let mut text = String::new();
+    for (index, (label, model)) in models.iter().enumerate() {
+        let segment = format!("{label} {model}");
+        if index == 0 {
+            text = segment;
+            continue;
+        }
+        let candidate = format!("{text} · {segment}");
+        if rect.w < 120 || format::width(&candidate) > usize::from(available) {
+            break;
+        }
+        text = candidate;
+    }
+    if !text.is_empty() {
         canvas.text_truncated(
             rect,
             model_x,
             rect.y,
-            &host.cpu_model,
+            &text,
             Style::fg(theme.dim).dim(),
             available,
         );

@@ -89,7 +89,7 @@ fn draw_card(canvas: &mut Canvas, app: &App, rect: Rect, gpu: &GpuSnapshot) {
     }
     let tty = app.graph_symbol() == GraphSymbol::Tty;
     let mut y = inner.y;
-    let name = format::sanitize(&gpu.name);
+    let name = super::hardware::gpu_name(gpu);
     if y < inner.bottom() {
         let vendor_label = gpu.vendor.label();
         let vendor = if gpu.driver.is_empty() || gpu.driver.eq_ignore_ascii_case(vendor_label) {
@@ -245,6 +245,9 @@ fn draw_facts(canvas: &mut Canvas, app: &App, rect: Rect, gpu: &GpuSnapshot) {
     if let Some(fan) = gpu.fan_percent {
         facts.push((format!("fan {fan:.0}%"), Style::fg(theme.dim)));
     }
+    if let Some(location) = super::hardware::gpu_location(gpu) {
+        facts.push((location, Style::fg(theme.dim).dim()));
+    }
     if facts.is_empty() {
         canvas.text(
             rect,
@@ -325,11 +328,12 @@ fn draw_list(canvas: &mut Canvas, app: &App, rect: Rect, gpus: &[GpuSnapshot]) {
         let util_width = 5u16.min(row.w);
         let temp_width = 5u16.min(row.w.saturating_sub(util_width));
         let name_width = row.w.saturating_sub(util_width + temp_width + 2).max(3);
+        let name = super::hardware::gpu_name(gpu);
         canvas.text_truncated(
             row,
             row.x,
             y,
-            &gpu.name,
+            &name,
             Style::fg(theme.foreground).bold(),
             name_width,
         );

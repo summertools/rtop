@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- CPU and GPU model labels in the second header line. The active view gets
+  priority (GPU in the GPU view, CPU elsewhere), and both are shown when the
+  terminal is wide enough.
+- GPU cards now include the PCI bus location (`pci 01:00.0`) when the driver
+  exposes it and the sensor row has room.
+- Blank GPU names fall back to a stable vendor/PCI/index description instead of
+  leaving an empty card.
+
+### Fixed
+
+- Header model labels and right-aligned facts no longer compete for the same
+  cells on narrow terminals.
+- Hardware model and PCI strings are sanitised and length-bounded before
+  layout, preventing control-character leaks or width distortion.
+
 ## [0.1.3] - 2026-11-09
 
 ### Added
@@ -90,5 +109,6 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
+[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.3...HEAD
 [0.1.1]: https://github.com/summertools/rtop/releases/tag/v0.1.1
 [0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0

@@ -33,7 +33,8 @@ single binary with no runtime services and no shell commands.
 - Braille, block, and plain-ASCII graphs with three-stop gradients and
   per-core history.
 - CPU package and per-core usage, model, frequency, load average, uptime,
-  temperature, and optional battery status.
+  temperature, and optional battery status. The CPU model is labelled in the
+  header and repeated in the dedicated CPU view when space allows.
 - RAM, swap, cached memory (Linux), free/available breakdown, mount usage, and
   disk I/O rates.
 - Network download/upload histories, automatic busiest-interface selection,
@@ -42,7 +43,9 @@ single binary with no runtime services and no shell commands.
   tree view, details, and signal delivery. `←`/`→` cycles sort fields quickly,
   and Linux tasks (threads) are never duplicated as separate processes.
 - Best-effort GPU monitoring: utilisation, VRAM, temperature, power, clocks,
-  fans, and history. NVIDIA uses NVML on Linux and Windows; AMD/Intel use the
+  fans, PCI bus location, and history. The GPU model is labelled in the header
+  when there is room, and every GPU card shows its full model name with a
+  vendor/PCI fallback. NVIDIA uses NVML on Linux and Windows; AMD/Intel use the
   Linux DRM/hwmon sysfs interfaces.
 - Eight built-in themes (including the new **Sakura** palette) and btop-compatible user `.theme` files. Dotted memory gauges are the default and can be switched back to solid blocks with `mem_style = "blocks"`.
 - Full mouse support: clickable tabs, process rows, interface rows, and wheel
@@ -57,7 +60,7 @@ single binary with no runtime services and no shell commands.
 
 ```text
   rtop   0 all   1 cpu   2 mem   3 net   4 proc                                      ? 14:32:08
- mybox · you · Linux (Fedora 42)  AMD Ryzen 7 7700   up 03:42:10 · load 1.24 0.98 0.74 · 3.80 GHz
+ mybox · you · Linux (Fedora 42)  cpu AMD Ryzen 7 7700   up 03:42:10 · load 1.24 0.98 0.74 · 3.80 GHz
 ╭─ cpu 27%  8 cores──────────────────────────────╮╭─ mem 61%  9.8 GiB / 16.0 GiB────────────────╮
 │27%  avg 22%  peak 64%              100% C0 ⣿⣿⣿⣿⣤⣀   41% ││Used      ●●●●●●●●●●●●●●·······   9.8 GiB  61%│
 │                                        C1 ⣿⣦⣀⣀⣀⣀   18% ││Available ●●●●●●●●···········   6.2 GiB  39%│
@@ -86,7 +89,8 @@ The exact layout adapts to the terminal size. Narrow terminals switch to a
 compact view automatically; press `1`–`5` to see one view at a time.
 
 When a supported GPU is present, `5` opens a dedicated GPU view and the
-overview adds a compact GPU column on wide terminals:
+overview adds a compact GPU column on wide terminals. Each card states the
+device model and, when the sensor row has room, its PCI bus address:
 
 ```text
   rtop  │  0 all   1 cpu   2 mem   3 net   4 proc   5 gpu                           ? keys 16:22:11
