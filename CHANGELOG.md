@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-15
+
+### Fixed
+
+- Restored the familiar full-width memory rows for Used, Available, Cached,
+  Free, and Swap. Each row again shows its exact value, percentage, and meter;
+  the 0.1.6 two-column grid felt cramped and lost the clear row-by-row reading
+  order, especially on narrower terminals.
+- Kept the used/cached/free composition strip, solid-block default, full-width
+  history, and stacked disk/top-memory sections.
+
+[0.1.7]: https://github.com/summertools/rtop/releases/tag/v0.1.7
+
 ## [0.1.6] - 2026-11-15
 
 ### Fixed
@@ -157,6 +170,6 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
-[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.7...HEAD
 [0.1.1]: https://github.com/summertools/rtop/releases/tag/v0.1.1
 [0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0

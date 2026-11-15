@@ -41,12 +41,9 @@ impl Composition {
 
 struct Metric {
     label: &'static str,
-    short_label: &'static str,
     value: String,
-    short_value: String,
     ratio: f32,
     gradient: Gradient,
-    is_swap: bool,
 }
 
 pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
@@ -86,8 +83,8 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     let mut y = inner.y;
     let bottom = inner.bottom();
 
-    // The composition strip is the visual anchor; the responsive breakdown
-    // below supplies every exact value and percentage.
+    // The composition strip is the visual anchor; the detailed rows below
+    // retain every exact value and percentage.
     if y < bottom {
         draw_composition_bar(
             canvas,
@@ -100,19 +97,24 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
         y = y.saturating_add(1);
     }
     if !compact && inner.h >= 12 && inner.w >= 60 && y < bottom {
-        // Give the detail grid room to breathe on tall, wide panels.
+        // A little breathing room between the gauge and the breakdown.
         y = y.saturating_add(1);
     }
-    if y < bottom && inner.w >= 24 {
-        let metrics = build_metrics(app, memory);
-        let grid_h = bottom.saturating_sub(y);
-        let used = draw_metric_grid(
+    let metrics = build_metrics(app, memory);
+    for metric in &metrics {
+        if y >= bottom {
+            break;
+        }
+        draw_mem_meter(
             canvas,
             app,
-            Rect::new(inner.x, y, inner.w, grid_h),
-            &metrics,
+            Rect::new(inner.x, y, inner.w, 1),
+            metric.label,
+            &metric.value,
+            metric.ratio,
+            metric.gradient,
         );
-        y = y.saturating_add(used);
+        y = y.saturating_add(1);
     }
 
     let mut remaining = bottom.saturating_sub(y);
@@ -166,6 +168,17 @@ fn draw_composition_bar(
         return;
     }
     let theme = &app.theme;
+    let label = "ram";
+    canvas.text(rect, rect.x, rect.y, label, Style::fg(theme.dim).dim());
+    let rect = Rect::new(
+        rect.x.saturating_add(4),
+        rect.y,
+        rect.w.saturating_sub(4),
+        1,
+    );
+    if rect.is_empty() {
+        return;
+    }
     let total = composition.total.max(1);
     let to_cells = |value: u64| -> u16 {
         let cells = (value as f64 / total as f64 * f64::from(rect.w)).round();
@@ -204,262 +217,43 @@ fn build_metrics(app: &App, memory: &MemorySnapshot) -> Vec<Metric> {
     let mut metrics = Vec::with_capacity(5);
     metrics.push(Metric {
         label: "Used",
-        short_label: "used",
         value: format::bytes(memory.used),
-        short_value: format::bytes_short(memory.used),
         ratio: memory.used as f32 / total as f32,
         gradient: theme.memory,
-        is_swap: false,
     });
     metrics.push(Metric {
         label: "Available",
-        short_label: "avail",
         value: format::bytes(memory.available),
-        short_value: format::bytes_short(memory.available),
         ratio: memory.available as f32 / total as f32,
         gradient: theme.net_down,
-        is_swap: false,
     });
     if let Some(cached) = memory.cached {
         metrics.push(Metric {
             label: "Cached",
-            short_label: "cache",
             value: format::bytes(cached),
-            short_value: format::bytes_short(cached),
             ratio: cached as f32 / total as f32,
             gradient: theme.disk,
-            is_swap: false,
         });
     }
     metrics.push(Metric {
         label: "Free",
-        short_label: "free",
         value: format::bytes(memory.free),
-        short_value: format::bytes_short(memory.free),
         ratio: memory.free as f32 / total as f32,
         gradient: Gradient::new(theme.good, theme.good, theme.accent),
-        is_swap: false,
     });
-    let swap_ratio = if memory.swap_total > 0 {
-        (memory.swap_used as f32 / memory.swap_total as f32).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    metrics.push(Metric {
-        label: "Swap",
-        short_label: "swap",
-        value: if memory.swap_total > 0 {
-            format!(
+    if memory.swap_total > 0 {
+        metrics.push(Metric {
+            label: "Swap",
+            value: format!(
                 "{}/{}",
                 format::bytes_short(memory.swap_used),
                 format::bytes_short(memory.swap_total)
-            )
-        } else {
-            "off".to_owned()
-        },
-        short_value: if memory.swap_total > 0 {
-            format!(
-                "{}/{}",
-                format::bytes_short(memory.swap_used),
-                format::bytes_short(memory.swap_total)
-            )
-        } else {
-            "off".to_owned()
-        },
-        ratio: swap_ratio,
-        gradient: theme.net_up,
-        is_swap: true,
-    });
+            ),
+            ratio: memory.swap_used as f32 / memory.swap_total as f32,
+            gradient: theme.net_up,
+        });
+    }
     metrics
-}
-
-/// Draw the exact memory breakdown in a responsive two-column layout.
-///
-/// Very wide panels get full-height metric bars; medium panels use compact
-/// bars; narrow panels keep the same exact values in a text grid. The swap
-/// row spans the full width because its used/total value is longer.
-fn draw_metric_grid(canvas: &mut Canvas, app: &App, rect: Rect, metrics: &[Metric]) -> u16 {
-    if rect.is_empty() || rect.w < 24 {
-        return 0;
-    }
-    let text_mode = rect.w < 60;
-    let compact_bars = rect.w < 96;
-    let columns = if rect.w < 48 { 1 } else { 2 };
-    let gap = if columns == 2 { 2u16 } else { 0 };
-    let column_w = rect
-        .w
-        .saturating_sub(gap.saturating_mul(columns as u16 - 1))
-        / columns as u16;
-    if column_w < 14 {
-        return 0;
-    }
-    let mut y = rect.y;
-    let mut drawn = 0u16;
-    let mut index = 0usize;
-    while index < metrics.len() && drawn < rect.h {
-        for column in 0..columns {
-            let Some(metric) = metrics.get(index + column) else {
-                break;
-            };
-            let x = rect
-                .x
-                .saturating_add((column as u16).saturating_mul(column_w.saturating_add(gap)));
-            let width = if column + 1 == columns {
-                rect.right().saturating_sub(x)
-            } else {
-                column_w
-            };
-            draw_metric_cell(
-                canvas,
-                app,
-                Rect::new(x, y, width, 1),
-                metric,
-                text_mode,
-                compact_bars,
-            );
-        }
-        y = y.saturating_add(1);
-        drawn = drawn.saturating_add(1);
-        index = index.saturating_add(columns);
-    }
-    drawn
-}
-
-fn draw_metric_cell(
-    canvas: &mut Canvas,
-    app: &App,
-    rect: Rect,
-    metric: &Metric,
-    text_mode: bool,
-    compact_bars: bool,
-) {
-    if rect.is_empty() || rect.w < 10 {
-        return;
-    }
-    if text_mode || (metric.is_swap && metric.value == "off") {
-        draw_text_metric(canvas, app, rect, metric);
-    } else if compact_bars {
-        draw_compact_metric_bar(canvas, app, rect, metric);
-    } else {
-        draw_mem_meter(
-            canvas,
-            app,
-            rect,
-            metric.label,
-            &metric.value,
-            metric.ratio,
-            metric.gradient,
-        );
-    }
-}
-
-fn draw_text_metric(canvas: &mut Canvas, app: &App, rect: Rect, metric: &Metric) {
-    if rect.is_empty() || rect.w < 10 {
-        return;
-    }
-    let theme = &app.theme;
-    let label = metric.short_label;
-    let percent = format::percent(metric.ratio * 100.0);
-    let show_percent = !(metric.is_swap && metric.value == "off");
-    let mut x =
-        rect.x
-            .saturating_add(canvas.text(rect, rect.x, rect.y, label, Style::fg(theme.dim)));
-    x = x.saturating_add(1);
-    let percent_width = if show_percent {
-        u16::try_from(format::width(&percent)).unwrap_or(4)
-    } else {
-        0
-    };
-    let value_room = rect
-        .right()
-        .saturating_sub(x)
-        .saturating_sub(if show_percent { percent_width + 2 } else { 0 });
-    if value_room == 0 {
-        return;
-    }
-    let value = if format::width(&metric.value) <= usize::from(value_room) {
-        &metric.value
-    } else {
-        &metric.short_value
-    };
-    x = x.saturating_add(canvas.text_truncated(
-        rect,
-        x,
-        rect.y,
-        value,
-        Style::fg(theme.foreground),
-        value_room,
-    ));
-    if show_percent {
-        x = x.saturating_add(2);
-        canvas.text(
-            rect,
-            x,
-            rect.y,
-            &percent,
-            Style::fg(metric.gradient.at(metric.ratio.clamp(0.0, 1.0))).bold(),
-        );
-    }
-}
-
-fn draw_compact_metric_bar(canvas: &mut Canvas, app: &App, rect: Rect, metric: &Metric) {
-    if rect.is_empty() || rect.w < 16 {
-        draw_text_metric(canvas, app, rect, metric);
-        return;
-    }
-    let theme = &app.theme;
-    let percent = format::percent(metric.ratio * 100.0);
-    let label_w = 6u16.min(rect.w / 4);
-    let percent_w = 5u16.min(rect.w);
-    let value_w = if metric.is_swap { 11 } else { 7 };
-    let value_x = rect.right().saturating_sub(percent_w + 1 + value_w);
-    let bar_x = rect.x.saturating_add(label_w + 1);
-    let bar_w = value_x.saturating_sub(bar_x).saturating_sub(1);
-    if bar_w < 3 {
-        draw_text_metric(canvas, app, rect, metric);
-        return;
-    }
-    canvas.text_truncated(
-        rect,
-        rect.x,
-        rect.y,
-        metric.short_label,
-        Style::fg(theme.dim),
-        label_w,
-    );
-    if app.config.mem_style == MemStyle::Dots {
-        crate::ui::widgets::dot_bar(
-            canvas,
-            Rect::new(bar_x, rect.y, bar_w, 1),
-            metric.ratio,
-            metric.gradient,
-            theme,
-            app.graph_symbol() == crate::config::GraphSymbol::Tty,
-        );
-    } else {
-        crate::ui::widgets::bar(
-            canvas,
-            Rect::new(bar_x, rect.y, bar_w, 1),
-            metric.ratio,
-            metric.gradient,
-            theme,
-            app.graph_symbol() == crate::config::GraphSymbol::Tty,
-        );
-    }
-    canvas.text_aligned(
-        Rect::new(value_x, rect.y, value_w, 1),
-        rect.y,
-        &metric.short_value,
-        Style::fg(theme.foreground),
-        Align::Right,
-    );
-    canvas.text_aligned(
-        Rect::new(rect.right().saturating_sub(percent_w), rect.y, percent_w, 1),
-        rect.y,
-        &percent,
-        Style::fg(metric.gradient.at(metric.ratio.clamp(0.0, 1.0))).bold(),
-        Align::Right,
-    );
 }
 
 fn draw_compact_lower(

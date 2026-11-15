@@ -300,8 +300,8 @@ fn memory_view_has_detailed_metrics_and_history() {
     let plain = canvas.plain();
     let used_line = plain
         .lines()
-        .find(|line| line.contains("Used") && line.contains("Available"))
-        .expect("used/available metric row");
+        .find(|line| line.contains("Used"))
+        .expect("Used metric row");
     assert!(used_line.contains("GiB"), "metric values: {used_line}");
     assert!(used_line.contains('%'), "metric percentages: {used_line}");
     assert!(used_line.contains('█'), "solid default gauge: {used_line}");
@@ -309,6 +309,7 @@ fn memory_view_has_detailed_metrics_and_history() {
         !used_line.contains('●'),
         "default gauge is dotted: {used_line}"
     );
+    assert!(plain.contains("Available"), "available detail missing");
     assert!(plain.contains("Cached"), "cached detail missing");
     assert!(plain.contains("Free"), "free detail missing");
     assert!(plain.contains("Swap"), "swap detail missing");
@@ -333,12 +334,6 @@ fn memory_view_handles_absent_cache_and_swap() {
         let (canvas, _) = ui::render(&app, width, height);
         let plain = canvas.plain();
         let lower = plain.to_lowercase();
-        if width >= 54 {
-            assert!(
-                lower.contains("swap") && lower.contains("off"),
-                "missing swap fallback: {plain}"
-            );
-        }
         if width >= 100 {
             assert!(!lower.contains("cached"), "cache should be hidden: {plain}");
         }

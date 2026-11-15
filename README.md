@@ -47,10 +47,10 @@ single binary with no runtime services and no shell commands.
   when there is room, and every GPU card shows its full model name with a
   vendor/PCI fallback. NVIDIA uses NVML on Linux and Windows; AMD/Intel use the
   Linux DRM/hwmon sysfs interfaces.
-- A memory panel with a used/cached/free composition strip and a responsive
-  two-column breakdown for Used, Available, Cached, Free, and Swap, including
-  exact values, percentages, and compact bars. Full-width history and ranked
-  top-memory bars complete the view. Solid gauges are the default; set
+- A memory panel with a used/cached/free composition strip and detailed
+  full-width rows for Used, Available, Cached, Free, and Swap, including exact
+  values, percentages, and meters. Full-width history and ranked top-memory
+  bars complete the view. Solid gauges are the default; set
   `mem_style = "dots"` for a dotted track.
 - Eight built-in themes (including the new **Sakura** palette) and
   btop-compatible user `.theme` files.
