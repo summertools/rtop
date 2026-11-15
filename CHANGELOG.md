@@ -6,8 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-15
+
 ### Added
 
+- Linux ARM64 (aarch64) release archive: `rtop-linux-aarch64-musl.tar.gz`, a
+  static build that runs on both glibc and musl distributions.
+- CI now exercises Linux ARM64 natively and builds the static musl target used
+  by releases.
 - CPU and GPU model labels in the second header line. The active view gets
   priority (GPU in the GPU view, CPU elsewhere), and both are shown when the
   terminal is wide enough.
@@ -22,6 +28,8 @@ All notable changes to this project are documented here. The format follows
   cells on narrow terminals.
 - Hardware model and PCI strings are sanitised and length-bounded before
   layout, preventing control-character leaks or width distortion.
+
+[0.1.4]: https://github.com/summertools/rtop/releases/tag/v0.1.4
 
 ## [0.1.3] - 2026-11-09
 
@@ -109,6 +117,6 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
-[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.4...HEAD
 [0.1.1]: https://github.com/summertools/rtop/releases/tag/v0.1.1
 [0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0

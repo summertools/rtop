@@ -159,8 +159,10 @@ cargo build --release
 
 Release archives contain a single `rtop` executable (`rtop.exe` on
 Windows). The release workflow publishes `rtop-linux-x86_64.tar.gz`,
-`rtop-macos-aarch64.tar.gz`, `rtop-macos-x86_64.tar.gz`, and
-`rtop-windows-x86_64.zip`, plus a `SHA256SUMS` file for integrity checks.
+`rtop-linux-aarch64-musl.tar.gz`, `rtop-macos-aarch64.tar.gz`,
+`rtop-macos-x86_64.tar.gz`, and `rtop-windows-x86_64.zip`, plus a
+`SHA256SUMS` file for integrity checks. The Linux ARM64 archive is a static
+musl build and runs on both glibc and musl distributions.
 
 ## Usage
 
@@ -379,6 +381,7 @@ Cross-platform checks used by CI:
 ```bash
 cargo check --target aarch64-apple-darwin
 cargo check --target x86_64-pc-windows-gnu
+cargo build --release --target aarch64-unknown-linux-musl
 ```
 
 The test suite covers formatting and width handling, sanitisation, theme

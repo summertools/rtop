@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -39,3 +39,9 @@ jobs:
 
       - name: Build release
         run: cargo build --release
+
+      - name: Build static ARM64 Linux binary
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: |
+          rustup target add aarch64-unknown-linux-musl
+          cargo build --locked --release --target aarch64-unknown-linux-musl

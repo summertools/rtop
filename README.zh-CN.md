@@ -123,9 +123,10 @@ cargo build --release
 ```
 
 发布压缩包中只有一个可执行文件：`rtop`（Windows 上为 `rtop.exe`）。发布流程会生成
-`rtop-linux-x86_64.tar.gz`、`rtop-macos-aarch64.tar.gz`、
-`rtop-macos-x86_64.tar.gz`、`rtop-windows-x86_64.zip`，以及用于完整性校验的
-`SHA256SUMS` 文件。
+`rtop-linux-x86_64.tar.gz`、`rtop-linux-aarch64-musl.tar.gz`、
+`rtop-macos-aarch64.tar.gz`、`rtop-macos-x86_64.tar.gz`、
+`rtop-windows-x86_64.zip`，以及用于完整性校验的 `SHA256SUMS` 文件。Linux ARM64
+压缩包是静态 musl 构建，可在 glibc 和 musl 发行版上运行。
 
 ## 使用
 
@@ -324,6 +325,7 @@ CI 使用的跨平台检查：
 ```bash
 cargo check --target aarch64-apple-darwin
 cargo check --target x86_64-pc-windows-gnu
+cargo build --release --target aarch64-unknown-linux-musl
 ```
 
 测试覆盖格式化与宽度处理、转义、主题解析、配置校验、图形缩放、画布宽字符修复、
