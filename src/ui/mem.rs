@@ -952,8 +952,20 @@ fn draw_disk_row(canvas: &mut Canvas, app: &App, rect: Rect, disk: &DiskSnapshot
         return;
     }
     let ratio = disk.used as f32 / disk.total.max(1) as f32;
-    let show_io = rect.w >= 96;
-    let io_w = if show_io { 16 } else { 0 };
+    let io = format!(
+        "R {} W {}",
+        format::rate_short(disk.read_rate),
+        format::rate_short(disk.write_rate)
+    );
+    let io_w = if rect.w >= 96 {
+        u16::try_from(format::width(&io))
+            .unwrap_or(u16::MAX)
+            .saturating_add(1)
+            .min(rect.w / 3)
+    } else {
+        0
+    };
+    let show_io = io_w > 0;
     let value_w = 15u16;
     let percent_w = 4u16;
     let label_w = (rect.w / 5).clamp(8, 16);
@@ -1014,11 +1026,6 @@ fn draw_disk_row(canvas: &mut Canvas, app: &App, rect: Rect, disk: &DiskSnapshot
         Align::Right,
     );
     if show_io {
-        let io = format!(
-            "R {} W {}",
-            format::rate_short(disk.read_rate),
-            format::rate_short(disk.write_rate)
-        );
         canvas.text_aligned(
             Rect::new(rect.right().saturating_sub(io_w), rect.y, io_w, 1),
             rect.y,

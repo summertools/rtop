@@ -327,6 +327,16 @@ fn memory_view_has_detailed_metrics_and_history() {
         .iter()
         .position(|line| line.contains(" disk ") && line.contains("R ") && line.contains("W "))
         .expect("disk separator and I/O summary");
+    let disk_row = lines
+        .iter()
+        .find(|line| line.contains("212G/512G"))
+        .expect("disk row with capacity");
+    let capacity_end = disk_row.find("212G/512G").unwrap() + "212G/512G".len();
+    let io_tail = disk_row.get(capacity_end..).unwrap_or_default();
+    assert!(
+        io_tail.starts_with(' ') && io_tail.trim_start().starts_with("R "),
+        "per-disk I/O should have its own separated column: {disk_row}"
+    );
     let top = lines
         .iter()
         .position(|line| line.contains(" top memory "))
