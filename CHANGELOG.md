@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-15
+
+### Fixed
+
+- Restored the detailed memory breakdown that 0.1.5 hid: Used, Available,
+  Cached, Free, and Swap each show their exact value, percentage, and compact
+  bar in a responsive two-column grid. Swap gets its own cell instead of a
+  full-width row, keeping the layout balanced.
+
+### Changed
+
+- The breakdown uses full bars on wide panels, compact bars on medium panels,
+  and a one-column text grid on very narrow terminals. Solid gauges remain the
+  default; dotted gauges are still available through `mem_style = "dots"`.
+
+[0.1.6]: https://github.com/summertools/rtop/releases/tag/v0.1.6
+
 ## [0.1.5] - 2026-11-15
 
 ### Changed
@@ -140,6 +157,6 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
-[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.6...HEAD
 [0.1.1]: https://github.com/summertools/rtop/releases/tag/v0.1.1
 [0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0

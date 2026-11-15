@@ -1,15 +1,14 @@
 //! Memory, swap, and disk panel.
 //!
-//! The panel is deliberately organised as a small set of visual layers rather
-//! than a stack of near-identical meters:
+//! The panel is deliberately organised as a small set of visual layers:
 //!
 //! * a composition strip showing used, reclaimable cache, and free memory;
-//! * a compact fact line for available memory and swap;
+//! * a responsive two-column breakdown with exact values and percentages;
 //! * a full-width history graph when vertical space allows;
 //! * disk and top-process sections below.
 //!
-//! This keeps the most important value (how full memory is) at the top while
-//! avoiding five full-width bars that repeat the same total.
+//! The breakdown keeps every memory detail visible while avoiding five
+//! full-width bars that repeat the same total.
 
 use crate::app::App;
 use crate::config::MemStyle;
@@ -23,7 +22,6 @@ use crate::ui::canvas::{Align, Canvas, Rect};
 struct Composition {
     used: u64,
     cached: u64,
-    free: u64,
     total: u64,
 }
 
@@ -36,18 +34,19 @@ impl Composition {
         Self {
             used,
             cached,
-            free: available.saturating_sub(cached),
             total,
         }
     }
 }
 
-struct LegendItem {
-    glyph: char,
+struct Metric {
     label: &'static str,
+    short_label: &'static str,
     value: String,
     short_value: String,
-    style: Style,
+    ratio: f32,
+    gradient: Gradient,
+    is_swap: bool,
 }
 
 pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
@@ -87,10 +86,8 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
     let mut y = inner.y;
     let bottom = inner.bottom();
 
-    // The composition strip is the visual anchor. Keep a legend row whenever
-    // there is room for it; it explains the three glyph/colour groups without
-    // making the user infer them from separate meter rows.
-    let hero_h = if inner.h >= 4 && inner.w >= 24 { 2 } else { 1 };
+    // The composition strip is the visual anchor; the responsive breakdown
+    // below supplies every exact value and percentage.
     if y < bottom {
         draw_composition_bar(
             canvas,
@@ -102,22 +99,20 @@ pub fn draw(canvas: &mut Canvas, app: &App, rect: Rect, compact: bool) {
         );
         y = y.saturating_add(1);
     }
-    if hero_h >= 2 && y < bottom {
-        draw_composition_legend(
-            canvas,
-            app,
-            Rect::new(inner.x, y, inner.w, 1),
-            memory,
-            composition,
-            dots,
-        );
+    if !compact && inner.h >= 12 && inner.w >= 60 && y < bottom {
+        // Give the detail grid room to breathe on tall, wide panels.
         y = y.saturating_add(1);
     }
-
-    // A single, quiet fact line is easier to scan than four more meters.
-    if y < bottom && inner.w >= 20 {
-        draw_facts(canvas, app, Rect::new(inner.x, y, inner.w, 1), memory);
-        y = y.saturating_add(1);
+    if y < bottom && inner.w >= 24 {
+        let metrics = build_metrics(app, memory);
+        let grid_h = bottom.saturating_sub(y);
+        let used = draw_metric_grid(
+            canvas,
+            app,
+            Rect::new(inner.x, y, inner.w, grid_h),
+            &metrics,
+        );
+        y = y.saturating_add(used);
     }
 
     let mut remaining = bottom.saturating_sub(y);
@@ -197,158 +192,274 @@ fn draw_composition_bar(
         } else if index < used_cells.saturating_add(cached_cells) {
             (cached_ch, Style::fg(theme.disk.at(0.55)))
         } else {
-            (free_ch, Style::fg(theme.border).dim())
+            (free_ch, Style::fg(theme.good).dim())
         };
         canvas.put(rect.x + index, rect.y, ch, style);
     }
 }
 
-fn draw_composition_legend(
-    canvas: &mut Canvas,
-    app: &App,
-    rect: Rect,
-    memory: &MemorySnapshot,
-    composition: Composition,
-    dots: bool,
-) {
-    if rect.is_empty() || rect.w < 12 {
-        return;
-    }
+fn build_metrics(app: &App, memory: &MemorySnapshot) -> Vec<Metric> {
     let theme = &app.theme;
-    let tty = app.graph_symbol() == crate::config::GraphSymbol::Tty;
-    let (used_ch, cached_ch, free_ch) = if dots {
-        if tty {
-            ('#', 'O', '.')
-        } else {
-            ('●', '◉', '·')
-        }
-    } else if tty {
-        ('#', '=', '-')
-    } else {
-        ('█', '▓', '░')
-    };
-    let mut items = vec![LegendItem {
-        glyph: used_ch,
-        label: "used",
-        value: format::bytes(composition.used),
-        short_value: format::bytes_short(composition.used),
-        style: Style::fg(theme.memory.at(0.55)).bold(),
-    }];
-    if memory.cached.is_some() {
-        items.push(LegendItem {
-            glyph: cached_ch,
-            label: "cached",
-            value: format::bytes(composition.cached),
-            short_value: format::bytes_short(composition.cached),
-            style: Style::fg(theme.disk.at(0.55)),
+    let total = memory.total.max(1);
+    let mut metrics = Vec::with_capacity(5);
+    metrics.push(Metric {
+        label: "Used",
+        short_label: "used",
+        value: format::bytes(memory.used),
+        short_value: format::bytes_short(memory.used),
+        ratio: memory.used as f32 / total as f32,
+        gradient: theme.memory,
+        is_swap: false,
+    });
+    metrics.push(Metric {
+        label: "Available",
+        short_label: "avail",
+        value: format::bytes(memory.available),
+        short_value: format::bytes_short(memory.available),
+        ratio: memory.available as f32 / total as f32,
+        gradient: theme.net_down,
+        is_swap: false,
+    });
+    if let Some(cached) = memory.cached {
+        metrics.push(Metric {
+            label: "Cached",
+            short_label: "cache",
+            value: format::bytes(cached),
+            short_value: format::bytes_short(cached),
+            ratio: cached as f32 / total as f32,
+            gradient: theme.disk,
+            is_swap: false,
         });
     }
-    items.push(LegendItem {
-        glyph: free_ch,
-        label: "free",
-        value: format::bytes(composition.free),
-        short_value: format::bytes_short(composition.free),
-        style: Style::fg(theme.dim),
+    metrics.push(Metric {
+        label: "Free",
+        short_label: "free",
+        value: format::bytes(memory.free),
+        short_value: format::bytes_short(memory.free),
+        ratio: memory.free as f32 / total as f32,
+        gradient: Gradient::new(theme.good, theme.good, theme.accent),
+        is_swap: false,
     });
-
-    let use_full = legend_width(&items, true) <= usize::from(rect.w);
-    let mut x = rect.x;
-    for (index, item) in items.iter().enumerate() {
-        let separator = if index == 0 { 0 } else { 3 };
-        let item_width = if use_full {
-            legend_item_width(item, true)
-        } else {
-            legend_item_width(item, false)
-        };
-        if usize::from(x.saturating_sub(rect.x))
-            .saturating_add(separator)
-            .saturating_add(item_width)
-            > usize::from(rect.w)
-        {
-            break;
-        }
-        if separator > 0 {
-            x = x.saturating_add(canvas.text(
-                rect,
-                x,
-                rect.y,
-                " │ ",
-                Style::fg(theme.border).dim(),
-            ));
-        }
-        x = x.saturating_add(canvas.text(rect, x, rect.y, &format!("{} ", item.glyph), item.style));
-        if use_full {
-            x = x.saturating_add(canvas.text(rect, x, rect.y, item.label, Style::fg(theme.dim)));
-            x = x.saturating_add(1);
-            x = x.saturating_add(canvas.text(rect, x, rect.y, &item.value, item.style));
-        } else {
-            x = x.saturating_add(canvas.text(rect, x, rect.y, &item.short_value, item.style));
-        }
-    }
-}
-
-fn legend_width(items: &[LegendItem], full: bool) -> usize {
-    items
-        .iter()
-        .enumerate()
-        .map(|(index, item)| legend_item_width(item, full) + if index == 0 { 0 } else { 3 })
-        .sum()
-}
-
-fn legend_item_width(item: &LegendItem, full: bool) -> usize {
-    if full {
-        2 + format::width(item.label) + 1 + format::width(&item.value)
-    } else {
-        2 + format::width(&item.short_value)
-    }
-}
-
-fn draw_facts(canvas: &mut Canvas, app: &App, rect: Rect, memory: &MemorySnapshot) {
-    if rect.is_empty() || rect.w < 16 {
-        return;
-    }
-    let theme = &app.theme;
-    let full = rect.w >= 44;
-    let available_label = if full { "available" } else { "avail" };
-    let available = if full {
-        format::bytes(memory.available)
-    } else {
-        format::bytes_short(memory.available)
-    };
     let swap_ratio = if memory.swap_total > 0 {
         (memory.swap_used as f32 / memory.swap_total as f32).clamp(0.0, 1.0)
     } else {
         0.0
     };
-    let swap_value = if memory.swap_total == 0 {
-        "off".to_owned()
-    } else if full {
-        format!(
-            "{} / {} ({})",
-            format::bytes_short(memory.swap_used),
-            format::bytes_short(memory.swap_total),
-            format::percent(swap_ratio * 100.0)
-        )
-    } else {
-        format::percent(swap_ratio * 100.0)
-    };
-    let swap_style = if memory.swap_total == 0 {
-        Style::fg(theme.dim)
-    } else {
-        Style::fg(theme.net_up.at(swap_ratio)).bold()
-    };
+    metrics.push(Metric {
+        label: "Swap",
+        short_label: "swap",
+        value: if memory.swap_total > 0 {
+            format!(
+                "{}/{}",
+                format::bytes_short(memory.swap_used),
+                format::bytes_short(memory.swap_total)
+            )
+        } else {
+            "off".to_owned()
+        },
+        short_value: if memory.swap_total > 0 {
+            format!(
+                "{}/{}",
+                format::bytes_short(memory.swap_used),
+                format::bytes_short(memory.swap_total)
+            )
+        } else {
+            "off".to_owned()
+        },
+        ratio: swap_ratio,
+        gradient: theme.net_up,
+        is_swap: true,
+    });
+    metrics
+}
 
-    let mut x = rect.x;
-    x = x.saturating_add(canvas.text(rect, x, rect.y, available_label, Style::fg(theme.dim)));
-    x = x.saturating_add(1);
-    x = x.saturating_add(canvas.text(rect, x, rect.y, &available, Style::fg(theme.accent)));
-
-    let swap = format!("swap {swap_value}");
-    if x < rect.right() && format::width(&swap) + 3 <= usize::from(rect.right().saturating_sub(x)) {
-        x = x.saturating_add(canvas.text(rect, x, rect.y, " · ", Style::fg(theme.border).dim()));
-        x = x.saturating_add(canvas.text(rect, x, rect.y, "swap ", Style::fg(theme.dim)));
-        canvas.text(rect, x, rect.y, &swap_value, swap_style);
+/// Draw the exact memory breakdown in a responsive two-column layout.
+///
+/// Very wide panels get full-height metric bars; medium panels use compact
+/// bars; narrow panels keep the same exact values in a text grid. The swap
+/// row spans the full width because its used/total value is longer.
+fn draw_metric_grid(canvas: &mut Canvas, app: &App, rect: Rect, metrics: &[Metric]) -> u16 {
+    if rect.is_empty() || rect.w < 24 {
+        return 0;
     }
+    let text_mode = rect.w < 60;
+    let compact_bars = rect.w < 96;
+    let columns = if rect.w < 48 { 1 } else { 2 };
+    let gap = if columns == 2 { 2u16 } else { 0 };
+    let column_w = rect
+        .w
+        .saturating_sub(gap.saturating_mul(columns as u16 - 1))
+        / columns as u16;
+    if column_w < 14 {
+        return 0;
+    }
+    let mut y = rect.y;
+    let mut drawn = 0u16;
+    let mut index = 0usize;
+    while index < metrics.len() && drawn < rect.h {
+        for column in 0..columns {
+            let Some(metric) = metrics.get(index + column) else {
+                break;
+            };
+            let x = rect
+                .x
+                .saturating_add((column as u16).saturating_mul(column_w.saturating_add(gap)));
+            let width = if column + 1 == columns {
+                rect.right().saturating_sub(x)
+            } else {
+                column_w
+            };
+            draw_metric_cell(
+                canvas,
+                app,
+                Rect::new(x, y, width, 1),
+                metric,
+                text_mode,
+                compact_bars,
+            );
+        }
+        y = y.saturating_add(1);
+        drawn = drawn.saturating_add(1);
+        index = index.saturating_add(columns);
+    }
+    drawn
+}
+
+fn draw_metric_cell(
+    canvas: &mut Canvas,
+    app: &App,
+    rect: Rect,
+    metric: &Metric,
+    text_mode: bool,
+    compact_bars: bool,
+) {
+    if rect.is_empty() || rect.w < 10 {
+        return;
+    }
+    if text_mode || (metric.is_swap && metric.value == "off") {
+        draw_text_metric(canvas, app, rect, metric);
+    } else if compact_bars {
+        draw_compact_metric_bar(canvas, app, rect, metric);
+    } else {
+        draw_mem_meter(
+            canvas,
+            app,
+            rect,
+            metric.label,
+            &metric.value,
+            metric.ratio,
+            metric.gradient,
+        );
+    }
+}
+
+fn draw_text_metric(canvas: &mut Canvas, app: &App, rect: Rect, metric: &Metric) {
+    if rect.is_empty() || rect.w < 10 {
+        return;
+    }
+    let theme = &app.theme;
+    let label = metric.short_label;
+    let percent = format::percent(metric.ratio * 100.0);
+    let show_percent = !(metric.is_swap && metric.value == "off");
+    let mut x =
+        rect.x
+            .saturating_add(canvas.text(rect, rect.x, rect.y, label, Style::fg(theme.dim)));
+    x = x.saturating_add(1);
+    let percent_width = if show_percent {
+        u16::try_from(format::width(&percent)).unwrap_or(4)
+    } else {
+        0
+    };
+    let value_room = rect
+        .right()
+        .saturating_sub(x)
+        .saturating_sub(if show_percent { percent_width + 2 } else { 0 });
+    if value_room == 0 {
+        return;
+    }
+    let value = if format::width(&metric.value) <= usize::from(value_room) {
+        &metric.value
+    } else {
+        &metric.short_value
+    };
+    x = x.saturating_add(canvas.text_truncated(
+        rect,
+        x,
+        rect.y,
+        value,
+        Style::fg(theme.foreground),
+        value_room,
+    ));
+    if show_percent {
+        x = x.saturating_add(2);
+        canvas.text(
+            rect,
+            x,
+            rect.y,
+            &percent,
+            Style::fg(metric.gradient.at(metric.ratio.clamp(0.0, 1.0))).bold(),
+        );
+    }
+}
+
+fn draw_compact_metric_bar(canvas: &mut Canvas, app: &App, rect: Rect, metric: &Metric) {
+    if rect.is_empty() || rect.w < 16 {
+        draw_text_metric(canvas, app, rect, metric);
+        return;
+    }
+    let theme = &app.theme;
+    let percent = format::percent(metric.ratio * 100.0);
+    let label_w = 6u16.min(rect.w / 4);
+    let percent_w = 5u16.min(rect.w);
+    let value_w = if metric.is_swap { 11 } else { 7 };
+    let value_x = rect.right().saturating_sub(percent_w + 1 + value_w);
+    let bar_x = rect.x.saturating_add(label_w + 1);
+    let bar_w = value_x.saturating_sub(bar_x).saturating_sub(1);
+    if bar_w < 3 {
+        draw_text_metric(canvas, app, rect, metric);
+        return;
+    }
+    canvas.text_truncated(
+        rect,
+        rect.x,
+        rect.y,
+        metric.short_label,
+        Style::fg(theme.dim),
+        label_w,
+    );
+    if app.config.mem_style == MemStyle::Dots {
+        crate::ui::widgets::dot_bar(
+            canvas,
+            Rect::new(bar_x, rect.y, bar_w, 1),
+            metric.ratio,
+            metric.gradient,
+            theme,
+            app.graph_symbol() == crate::config::GraphSymbol::Tty,
+        );
+    } else {
+        crate::ui::widgets::bar(
+            canvas,
+            Rect::new(bar_x, rect.y, bar_w, 1),
+            metric.ratio,
+            metric.gradient,
+            theme,
+            app.graph_symbol() == crate::config::GraphSymbol::Tty,
+        );
+    }
+    canvas.text_aligned(
+        Rect::new(value_x, rect.y, value_w, 1),
+        rect.y,
+        &metric.short_value,
+        Style::fg(theme.foreground),
+        Align::Right,
+    );
+    canvas.text_aligned(
+        Rect::new(rect.right().saturating_sub(percent_w), rect.y, percent_w, 1),
+        rect.y,
+        &percent,
+        Style::fg(metric.gradient.at(metric.ratio.clamp(0.0, 1.0))).bold(),
+        Align::Right,
+    );
 }
 
 fn draw_compact_lower(
@@ -855,25 +966,19 @@ mod tests {
         let normal = Composition::new(&memory(100, 40, 60, Some(20)));
         assert_eq!(normal.used, 40);
         assert_eq!(normal.cached, 20);
-        assert_eq!(normal.free, 40);
-        assert_eq!(normal.used + normal.cached + normal.free, normal.total);
+        assert_eq!(normal.total - normal.used - normal.cached, 40);
 
         let over_cached = Composition::new(&memory(100, 70, 30, Some(50)));
         assert_eq!(over_cached.cached, 30);
-        assert_eq!(over_cached.free, 0);
-        assert_eq!(
-            over_cached.used + over_cached.cached + over_cached.free,
-            over_cached.total
-        );
+        assert_eq!(over_cached.total - over_cached.used - over_cached.cached, 0);
 
         let no_cache = Composition::new(&memory(100, 60, 40, None));
         assert_eq!(no_cache.cached, 0);
-        assert_eq!(no_cache.free, 40);
-        assert_eq!(no_cache.used + no_cache.free, no_cache.total);
+        assert_eq!(no_cache.total - no_cache.used - no_cache.cached, 40);
 
         let oversized = Composition::new(&memory(100, 150, 0, Some(50)));
         assert_eq!(oversized.used, 100);
         assert_eq!(oversized.cached, 0);
-        assert_eq!(oversized.free, 0);
+        assert_eq!(oversized.total - oversized.used - oversized.cached, 0);
     }
 }

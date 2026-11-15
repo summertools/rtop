@@ -39,9 +39,10 @@
   GPU 型号会在顶部信息栏空间足够时标注；每张 GPU 卡片都会显示完整型号，名称缺失时
   回退到厂商/PCI 描述。Linux/Windows 的 NVIDIA 设备通过 NVML 读取，Linux 的
   AMD/Intel 设备通过 DRM/hwmon sysfs 读取。
-- 内存面板以 used/cached/free 组合条和清晰图例为核心，配合简洁的 available/swap
-  信息行、全宽历史曲线，以及带排名和比例条的内存占用进程列表。默认使用实心方块，
-  可通过 `mem_style = "dots"` 切换为点状样式。
+- 内存面板以 used/cached/free 组合条为核心，并用自适应两列布局展示 Used、
+  Available、Cached、Free 和 Swap 的精确数值、百分比和紧凑计量条；同时提供全宽
+  历史曲线和带排名/比例条的内存占用进程列表。默认使用实心方块，可通过
+  `mem_style = "dots"` 切换为点状样式。
 - 8 个内置主题（含新的 **Sakura** 主题），并兼容 btop 的 `.theme` 用户主题文件。
 - 完整鼠标支持：点击标签页、进程行、网卡行以及滚轮滚动。
 - `--dump` 可在没有 TTY 的环境渲染一帧，适合 CI、脚本和截图。
