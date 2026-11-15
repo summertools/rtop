@@ -39,8 +39,10 @@
   GPU 型号会在顶部信息栏空间足够时标注；每张 GPU 卡片都会显示完整型号，名称缺失时
   回退到厂商/PCI 描述。Linux/Windows 的 NVIDIA 设备通过 NVML 读取，Linux 的
   AMD/Intel 设备通过 DRM/hwmon sysfs 读取。
+- 内存面板以 used/cached/free 组合条和清晰图例为核心，配合简洁的 available/swap
+  信息行、全宽历史曲线，以及带排名和比例条的内存占用进程列表。默认使用实心方块，
+  可通过 `mem_style = "dots"` 切换为点状样式。
 - 8 个内置主题（含新的 **Sakura** 主题），并兼容 btop 的 `.theme` 用户主题文件。
-  内存计量默认使用点状样式，可通过 `mem_style = "blocks"` 切回实心方块。
 - 完整鼠标支持：点击标签页、进程行、网卡行以及滚轮滚动。
 - `--dump` 可在没有 TTY 的环境渲染一帧，适合 CI、脚本和截图。
 - 不执行 shell、不访问网络、限制文件读取大小、转义 ANSI/双向控制字符、
@@ -228,7 +230,7 @@ rounded_corners = true
 theme_background = false
 show_battery = true
 show_gpu = true         # 检测到设备时显示 GPU 视图与摘要
-mem_style = "dots"      # dots | blocks（内存计量样式）
+mem_style = "blocks"    # blocks | dots（内存计量样式）
 proc_sort = "cpu"       # cpu、memory、pid、name、user
 proc_tree = false
 proc_reversed = false
@@ -247,7 +249,7 @@ show_key_hints = true
 
 内置主题：`default`（Tokyo Night）、`dracula`、`gruvbox`、`nord`、`catppuccin`、
 `sakura`、`light`、`tty`。**Sakura** 使用深梅色背景与玫瑰、薄荷、薰衣草色调，
-特别适合默认的点状内存计量。
+尤其适合内存计量面板。
 
 用户主题放在平台配置目录下的 `rtop/themes/`（例如 Linux 的
 `~/.config/rtop/themes/`、macOS 的

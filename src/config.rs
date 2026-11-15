@@ -121,9 +121,9 @@ impl fmt::Display for ProcSort {
 #[serde(rename_all = "lowercase")]
 pub enum MemStyle {
     /// Round dots with a subtle dotted track.
-    #[default]
     Dots,
     /// Solid blocks and a dim block track.
+    #[default]
     Blocks,
 }
 
@@ -185,7 +185,7 @@ impl Default for Config {
             theme_background: false,
             show_battery: true,
             show_gpu: true,
-            mem_style: MemStyle::Dots,
+            mem_style: MemStyle::Blocks,
             proc_sort: ProcSort::Cpu,
             proc_tree: false,
             proc_reversed: false,
@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(config.update_ms, 1_000);
         assert!(!config.read_only);
         assert!(config.show_gpu);
-        assert_eq!(config.mem_style, MemStyle::Dots);
+        assert_eq!(config.mem_style, MemStyle::Blocks);
         assert!(config.validate().is_empty());
     }
 

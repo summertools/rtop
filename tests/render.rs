@@ -264,11 +264,11 @@ fn memory_gauges_support_dotted_and_block_styles() {
     let used = canvas
         .plain()
         .lines()
-        .find(|line| line.contains("Used"))
-        .expect("Used row")
+        .find(|line| line.contains("used") && line.contains("free"))
+        .expect("used/free legend")
         .to_owned();
-    assert!(used.contains('●'), "dotted Used row: {used}");
-    assert!(!used.contains('█'), "dotted row contains blocks: {used}");
+    assert!(used.contains('●'), "dotted legend: {used}");
+    assert!(!used.contains('█'), "dotted legend contains blocks: {used}");
 
     let mut blocks = dotted.clone();
     blocks.config.mem_style = MemStyle::Blocks;
@@ -276,11 +276,68 @@ fn memory_gauges_support_dotted_and_block_styles() {
     let used = canvas
         .plain()
         .lines()
-        .find(|line| line.contains("Used"))
-        .expect("Used row")
+        .find(|line| line.contains("used") && line.contains("free"))
+        .expect("used/free legend")
         .to_owned();
-    assert!(used.contains('█'), "block Used row: {used}");
-    assert!(!used.contains('●'), "block row contains dots: {used}");
+    assert!(used.contains('█'), "block legend: {used}");
+    assert!(!used.contains('●'), "block legend contains dots: {used}");
+}
+
+#[test]
+fn memory_view_has_a_composition_legend_and_history() {
+    let config = Config {
+        preset: 2,
+        ..Config::default()
+    };
+    let app = app(config);
+    let (canvas, _) = ui::render(&app, 120, 36);
+    let plain = canvas.plain();
+    let legend = plain
+        .lines()
+        .find(|line| line.contains("used") && line.contains("cached") && line.contains("free"))
+        .expect("composition legend");
+    assert!(legend.contains("GiB"), "legend values: {legend}");
+    assert!(
+        legend.contains('█'),
+        "default gauges should be solid: {legend}"
+    );
+    assert!(
+        !legend.contains('●'),
+        "default gauges should not be dotted: {legend}"
+    );
+    assert!(plain.contains("history"), "history section missing");
+    assert!(plain.contains("top memory"), "top memory section missing");
+}
+
+#[test]
+fn memory_view_handles_absent_cache_and_swap() {
+    let mut app = app(Config {
+        preset: 2,
+        ..Config::default()
+    });
+    app.preset = Preset::Memory;
+    if let Some(snapshot) = app.snapshot.as_mut() {
+        snapshot.memory.cached = None;
+        snapshot.memory.swap_total = 0;
+        snapshot.memory.swap_used = 0;
+        snapshot.memory.swap_free = 0;
+    }
+    for (width, height) in [(40, 12), (54, 14), (80, 24), (120, 36), (200, 60)] {
+        let (canvas, _) = ui::render(&app, width, height);
+        let plain = canvas.plain();
+        if width >= 54 {
+            assert!(plain.contains("swap off"), "missing swap fallback: {plain}");
+        }
+        if width >= 100 {
+            assert!(!plain.contains("cached"), "cache should be hidden: {plain}");
+        }
+        for line in plain.lines() {
+            assert!(
+                format::width(line) <= usize::from(width),
+                "line wider than {width}: {line:?}"
+            );
+        }
+    }
 }
 
 #[test]

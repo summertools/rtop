@@ -378,9 +378,14 @@ mod tests {
                 };
                 if tid != pid {
                     let (tcount, is_thread) = thread_info(tid);
-                    assert!(tcount.unwrap_or(0) >= 1);
-                    assert!(is_thread, "task {tid} was not recognised as a thread");
-                    return;
+                    // Test-harness threads can exit between read_dir and the
+                    // procfs read. Skip a transient task and try another one;
+                    // the stable threads that do resolve must be recognised.
+                    if let Some(tcount) = tcount {
+                        assert!(tcount >= 1);
+                        assert!(is_thread, "task {tid} was not recognised as a thread");
+                        return;
+                    }
                 }
             }
         }

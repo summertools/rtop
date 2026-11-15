@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-15
+
+### Changed
+
+- Redesigned the memory panel around a single used/cached/free composition
+  strip with an explanatory legend. Exact available memory and swap state now
+  sit on a quiet fact line instead of five repeated full-width meters.
+- The memory history graph now spans the panel, and disk/top-memory sections
+  stack vertically so wide terminals can show per-disk I/O and process share
+  bars without dead columns.
+- Top-memory rows now include rank numbers and proportional bars. Disk rows
+  expose per-disk read/write rates when width allows.
+- Memory gauges now default to solid blocks. The dotted style remains available
+  with `mem_style = "dots"`.
+
+### Fixed
+
+- The Linux thread-info test no longer fails when a short-lived test-harness
+  thread disappears between reading `/proc/self/task` and
+  `/proc/<tid>/status`.
+
+[0.1.5]: https://github.com/summertools/rtop/releases/tag/v0.1.5
+
 ## [0.1.4] - 2026-11-15
 
 ### Added
@@ -117,6 +140,6 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
-[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.5...HEAD
 [0.1.1]: https://github.com/summertools/rtop/releases/tag/v0.1.1
 [0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0

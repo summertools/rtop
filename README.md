@@ -47,7 +47,11 @@ single binary with no runtime services and no shell commands.
   when there is room, and every GPU card shows its full model name with a
   vendor/PCI fallback. NVIDIA uses NVML on Linux and Windows; AMD/Intel use the
   Linux DRM/hwmon sysfs interfaces.
-- Eight built-in themes (including the new **Sakura** palette) and btop-compatible user `.theme` files. Dotted memory gauges are the default and can be switched back to solid blocks with `mem_style = "blocks"`.
+- A memory panel built around a used/cached/free composition strip, a concise
+  available/swap summary, full-width history, and ranked top-memory bars.
+  Solid gauges are the default; set `mem_style = "dots"` for a dotted track.
+- Eight built-in themes (including the new **Sakura** palette) and
+  btop-compatible user `.theme` files.
 - Full mouse support: clickable tabs, process rows, interface rows, and wheel
   scrolling.
 - `--dump` renders one frame without a TTY, which is useful in CI, scripts, and
@@ -267,7 +271,7 @@ rounded_corners = true
 theme_background = false
 show_battery = true
 show_gpu = true         # GPU view and summary when a device is detected
-mem_style = "dots"      # dots | blocks (memory gauges)
+mem_style = "blocks"    # blocks | dots (memory gauges)
 proc_sort = "cpu"       # cpu, memory, pid, name, user
 proc_tree = false
 proc_reversed = false
@@ -288,7 +292,7 @@ compatibility. Configuration and theme files are limited to 128 KiB.
 Built-in themes: `default` (Tokyo Night), `dracula`, `gruvbox`, `nord`,
 `catppuccin`, `sakura`, `light`, and `tty`. **Sakura** is a deep plum palette
 with rose, mint, and lavender accents; it pairs particularly well with the
-default dotted memory gauges.
+memory gauges.
 
 User themes live in the platform configuration directory under `rtop/themes/`
 (for example `~/.config/rtop/themes/` on Linux,
