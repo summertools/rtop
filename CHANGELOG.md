@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-15
+
+### Fixed
+
+- Disk-row I/O columns now reserve width from their actual formatted values,
+  preventing fast or long rates from colliding with the used/total capacity.
+- Added regression coverage for the memory-to-disk section divider and the
+  space between disk capacity and per-disk I/O values.
+
+### Changed
+
+- Refined the full-view RAM breakdown into balanced Used/Available and
+  Cached/Free cards with full values, percentages, and meters. Compact overview
+  tiles preserve their one-line layout.
+
+[0.1.9]: https://github.com/summertools/rtop/releases/tag/v0.1.9
+
 ## [0.1.8] - 2026-11-15
 
 ### Changed
@@ -184,6 +201,6 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
-[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.9...HEAD
 [0.1.1]: https://github.com/summertools/rtop/releases/tag/v0.1.1
 [0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0
