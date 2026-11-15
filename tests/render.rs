@@ -261,31 +261,31 @@ fn memory_gauges_support_dotted_and_block_styles() {
     });
     dotted.preset = Preset::Memory;
     let (canvas, _) = ui::render(&dotted, 120, 36);
-    let used = canvas
-        .plain()
-        .lines()
-        .find(|line| line.contains("Used"))
-        .expect("Used metric row")
-        .to_owned();
-    assert!(used.contains('●'), "dotted metric row: {used}");
+    let lines: Vec<_> = canvas.plain().lines().map(str::to_owned).collect();
+    let index = lines
+        .iter()
+        .position(|line| line.contains("Used"))
+        .expect("Used metric card");
+    let used = lines.get(index + 1).expect("Used bar row");
+    assert!(used.contains('●'), "dotted metric bar: {used}");
     assert!(
         !used.contains('█'),
-        "dotted metric row contains blocks: {used}"
+        "dotted metric bar contains blocks: {used}"
     );
 
     let mut blocks = dotted.clone();
     blocks.config.mem_style = MemStyle::Blocks;
     let (canvas, _) = ui::render(&blocks, 120, 36);
-    let used = canvas
-        .plain()
-        .lines()
-        .find(|line| line.contains("Used"))
-        .expect("Used metric row")
-        .to_owned();
-    assert!(used.contains('█'), "block metric row: {used}");
+    let lines: Vec<_> = canvas.plain().lines().map(str::to_owned).collect();
+    let index = lines
+        .iter()
+        .position(|line| line.contains("Used"))
+        .expect("Used metric card");
+    let used = lines.get(index + 1).expect("Used bar row");
+    assert!(used.contains('█'), "block metric bar: {used}");
     assert!(
         !used.contains('●'),
-        "block metric row contains dots: {used}"
+        "block metric bar contains dots: {used}"
     );
 }
 
@@ -298,16 +298,19 @@ fn memory_view_has_detailed_metrics_and_history() {
     let app = app(config);
     let (canvas, _) = ui::render(&app, 120, 36);
     let plain = canvas.plain();
-    let used_line = plain
-        .lines()
-        .find(|line| line.contains("Used"))
-        .expect("Used metric row");
+    let lines: Vec<_> = plain.lines().collect();
+    let used_index = lines
+        .iter()
+        .position(|line| line.contains("Used"))
+        .expect("Used metric card");
+    let used_line = lines[used_index];
+    let used_bar = lines.get(used_index + 1).expect("Used bar row");
     assert!(used_line.contains("GiB"), "metric values: {used_line}");
     assert!(used_line.contains('%'), "metric percentages: {used_line}");
-    assert!(used_line.contains('█'), "solid default gauge: {used_line}");
+    assert!(used_bar.contains('█'), "solid default gauge: {used_bar}");
     assert!(
-        !used_line.contains('●'),
-        "default gauge is dotted: {used_line}"
+        !used_bar.contains('●'),
+        "default gauge is dotted: {used_bar}"
     );
     assert!(plain.contains("Available"), "available detail missing");
     assert!(plain.contains("Cached"), "cached detail missing");
@@ -315,6 +318,28 @@ fn memory_view_has_detailed_metrics_and_history() {
     assert!(plain.contains("Swap"), "swap detail missing");
     assert!(plain.contains("history"), "history section missing");
     assert!(plain.contains("top memory"), "top memory section missing");
+    let lines: Vec<_> = plain.lines().collect();
+    let history = lines
+        .iter()
+        .position(|line| line.contains("memory history"))
+        .expect("memory history separator");
+    let disk = lines
+        .iter()
+        .position(|line| line.contains(" disk ") && line.contains("R ") && line.contains("W "))
+        .expect("disk separator and I/O summary");
+    let top = lines
+        .iter()
+        .position(|line| line.contains(" top memory "))
+        .expect("top-memory separator");
+    assert!(
+        history < disk && disk < top,
+        "section order: {history}, {disk}, {top}"
+    );
+    assert!(
+        lines[disk].matches('─').count() >= 4,
+        "disk divider is too faint: {}",
+        lines[disk]
+    );
 }
 
 #[test]
@@ -337,6 +362,10 @@ fn memory_view_handles_absent_cache_and_swap() {
         if width >= 100 {
             assert!(!lower.contains("cached"), "cache should be hidden: {plain}");
         }
+        assert!(
+            lower.contains("swap") && lower.contains("off"),
+            "missing disabled-swap detail: {plain}"
+        );
         for line in plain.lines() {
             assert!(
                 format::width(line) <= usize::from(width),

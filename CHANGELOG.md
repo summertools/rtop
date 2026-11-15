@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-15
+
+### Changed
+
+- Added thin, theme-aware section rules for the memory breakdown, history,
+  disks, and top-memory processes. Disk capacity and I/O now read as a distinct
+  section instead of flowing directly out of the RAM history graph.
+- The full memory view groups Used/Available and Cached/Free into two-column
+  cards, each with its exact value, percentage, and a restrained bar. Swap is
+  kept as a separate full-width row. Compact overview tiles retain their
+  one-line metrics so they still fit small panels.
+
+[0.1.8]: https://github.com/summertools/rtop/releases/tag/v0.1.8
+
 ## [0.1.7] - 2026-11-15
 
 ### Fixed
@@ -170,6 +184,6 @@ All notable changes to this project are documented here. The format follows
 - Unit, integration, layout, and CLI test suites with `cargo fmt` and strict
   `clippy` enforcement.
 
-[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/summertools/rtop/compare/v0.1.8...HEAD
 [0.1.1]: https://github.com/summertools/rtop/releases/tag/v0.1.1
 [0.1.0]: https://github.com/summertools/rtop/releases/tag/v0.1.0
